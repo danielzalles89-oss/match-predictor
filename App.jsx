@@ -20,7 +20,7 @@ const provider = new GoogleAuthProvider();
 // ─── EMAILJS CONFIG ───────────────────────────────────────────────────────────
 const EMAILJS_SERVICE_ID  = "dzalles@iterla.com";
 const EMAILJS_TEMPLATE_ID = "template_33yasn5";
-const EMAILJS_PUBLIC_KEY  = "fFp98basKwYl2UL7c";
+const EMAILJS_PUBLIC_KEY  = "lKMwUgdBhxa_0t7sDeq1l";
 
 const ADMIN_PW = "wc2026admin";
 
