@@ -120,9 +120,7 @@ function calcScore(pred, actual) {
   if (!pred||pred.h==null||pred.a==null||pred.h===""||pred.a==="") return 0;
   const ph=Number(pred.h),pa=Number(pred.a),ah=Number(actual.h),aa=Number(actual.a);
   if (isNaN(ph)||isNaN(pa)||isNaN(ah)||isNaN(aa)) return 0;
-  if (ph===ah&&pa===aa) return 3;
-  const pw=ph>pa?"h":ph<pa?"a":"d",aw=ah>aa?"h":ah<aa?"a":"d";
-  return pw===aw?1:0;
+  return (ph===ah&&pa===aa) ? 1 : 0;
 }
 
 function isLocked(match) { return new Date() >= new Date(match.kickoff); }
@@ -238,14 +236,14 @@ function PredictPage({matchId, userId, userName}) {
               <div style={{color:T.light,fontSize:11,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Final Result</div>
               <div style={{color:T.gold,fontSize:32,fontWeight:900,fontFamily:"'Courier New',monospace",marginBottom:8}}>{actual.h} : {actual.a}</div>
               {pts!==null&&(
-                <span style={{display:"inline-block",background:pts===3?"rgba(245,200,66,0.15)":pts===1?"rgba(46,204,113,0.15)":"rgba(231,76,60,0.15)",color:pts===3?T.gold:pts===1?T.green:T.red,padding:"5px 18px",borderRadius:20,fontSize:13,fontWeight:800}}>
-                  {pts===3?"🎯 Exact score! +3 pts":pts===1?"✓ Correct result +1 pt":"✗ No points this time"}
+                <span style={{display:"inline-block",background:pts===1?"rgba(245,200,66,0.15)":"rgba(231,76,60,0.15)",color:pts===1?T.gold:T.red,padding:"5px 18px",borderRadius:20,fontSize:13,fontWeight:800}}>
+                  {pts===1?"🎯 Exact score! +1 pt":"✗ Wrong score"}
                 </span>
               )}
             </div>
           )}
         </div>
-        <div style={{textAlign:"center",marginTop:14,color:T.muted,fontSize:12}}>✓ Correct result = 1 pt · 🎯 Exact score = 3 pts</div>
+        <div style={{textAlign:"center",marginTop:14,color:T.muted,fontSize:12}}>🎯 Exact score = 1 pt · ✗ Wrong = 0 pts</div>
       </div>
     </div>
   );
@@ -417,7 +415,7 @@ export default function App() {
   <h2 style="color:#20B2AA;margin:0 0 4px">⚽ WC 2026 Match Predictor</h2>
   <p style="color:#83BAB5;margin:0 0 20px">Hi ${player.name}! Pick your scores before kickoff.</p>
   ${matchButtons}
-  <p style="color:#83BAB5;font-size:12px;margin-top:20px">✓ Correct result = 1 pt &nbsp;·&nbsp; 🎯 Exact score = 3 pts</p>
+  <p style="color:#83BAB5;font-size:12px;margin-top:20px">🎯 Exact score = 1 pt · ✗ Wrong = 0 pts</p>
   <p style="color:#4a7a8a;font-size:11px">Zalles WC 2026 Quiniela</p>
 </div>`;
         try {
@@ -718,8 +716,8 @@ export default function App() {
                       <div key={`s${i}`} style={{color:T.teal,fontSize:16,fontWeight:900,fontFamily:"monospace",textAlign:"center",borderTop:`1px solid ${T.border}`,padding:"6px 0"}}>{p.h} : {p.a}</div>
                       <div key={`p${i}`} style={{textAlign:"center",borderTop:`1px solid ${T.border}`,padding:"6px 0"}}>
                         <span style={{
-                          background:p.pts===3?"#f5c84222":p.pts===1?"#2ecc7122":actual?"#e74c3c22":"transparent",
-                          color:p.pts===3?T.gold:p.pts===1?T.green:actual?T.red:T.muted,
+                          background:p.pts===1?"#f5c84222":actual?"#e74c3c22":"transparent",
+                          color:p.pts===1?T.gold:actual?T.red:T.muted,
                           padding:"2px 10px",borderRadius:20,fontSize:13,fontWeight:800,
                         }}>
                           {actual&&actual.h!==""?`+${p.pts}`:"—"}
