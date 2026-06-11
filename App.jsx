@@ -270,6 +270,8 @@ export default function App() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loadingLb, setLoadingLb] = useState(false);
   const [selectedMatches, setSelectedMatches] = useState([]);
+  const [allPredictions, setAllPredictions] = useState({});
+  const [loadingPreds, setLoadingPreds] = useState(false);
 
   const urlParams = new URLSearchParams(window.location.search);
   const predictMatchId = urlParams.get("match");
@@ -298,6 +300,31 @@ export default function App() {
   async function loadActuals() {
     const snap = await getDoc(doc(db,"actuals","results"));
     if (snap.exists()) setActuals(snap.data());
+  }
+
+  async function loadAllPredictions() {
+    setLoadingPreds(true);
+    const pSnap = await getDocs(collection(db,"players"));
+    const playerList = [];
+    pSnap.forEach(d=>playerList.push({id:d.id,...d.data()}));
+    const aSnap = await getDoc(doc(db,"actuals","results"));
+    const cur = aSnap.exists()?aSnap.data():{};
+    // Load all predictions for played matches
+    const played = ALL_MATCHES.filter(m=>isLocked(m));
+    const result = {};
+    for (const m of played) {
+      result[m.id] = { match: m, actual: cur[m.id]||null, preds: [] };
+      for (const p of playerList) {
+        const doc2 = await getDoc(doc(db,"match_predictions",`${m.id}_${p.id}`));
+        if (doc2.exists()) {
+          const data = doc2.data();
+          const pts = calcScore(data, cur[m.id]||{});
+          result[m.id].preds.push({ name: p.name, h: data.h, a: data.a, pts });
+        }
+      }
+    }
+    setAllPredictions(result);
+    setLoadingPreds(false);
   }
 
   async function loadLeaderboard() {
@@ -485,6 +512,7 @@ export default function App() {
         <button style={navStyle("matches")} onClick={()=>setScreen("matches")}>📧 Send Emails</button>
         <button style={navStyle("players")} onClick={()=>setScreen("players")}>👥 Players</button>
         <button style={navStyle("results")} onClick={()=>setScreen("results")}>⚽ Results</button>
+        <button style={navStyle("predictions")} onClick={()=>{setScreen("predictions");loadAllPredictions();}}>🔍 Predictions</button>
         <button style={navStyle("leaderboard")} onClick={()=>{setScreen("leaderboard");loadLeaderboard();}}>🏅 Leaderboard</button>
       </div>
 
@@ -637,6 +665,68 @@ export default function App() {
               {saveMsg&&<span style={{color:T.green,fontWeight:800}}>{saveMsg}</span>}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── PREDICTIONS VIEW ── */}
+      {screen==="predictions"&&(
+        <div style={{maxWidth:700,margin:"0 auto",padding:16}}>
+          <div style={{color:T.white,fontWeight:900,fontSize:18,marginBottom:16}}>🔍 All Predictions</div>
+          {loadingPreds?(
+            <div style={{textAlign:"center",color:T.muted,padding:40}}>Loading predictions...</div>
+          ):Object.keys(allPredictions).length===0?(
+            <div style={{textAlign:"center",color:T.muted,padding:40}}>No predictions yet — matches haven't started.</div>
+          ):Object.values(allPredictions).map(({match:m, actual, preds})=>(
+            <div key={m.id} style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:16,marginBottom:12}}>
+              {/* Match header */}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:20}}>{FLAGS[m.home]||"🏳️"}</span>
+                  <span style={{color:T.white,fontWeight:800,fontSize:15}}>{m.home} vs {m.away}</span>
+                  <span style={{fontSize:20}}>{FLAGS[m.away]||"🏳️"}</span>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  {actual&&actual.h!==""&&actual.a!==""?(
+                    <span style={{background:"#f5c84222",color:T.gold,padding:"3px 12px",borderRadius:20,fontWeight:900,fontSize:14,fontFamily:"monospace"}}>
+                      Result: {actual.h} : {actual.a}
+                    </span>
+                  ):(
+                    <span style={{background:"#1a3080",color:T.muted,padding:"3px 12px",borderRadius:20,fontSize:12}}>
+                      No result yet
+                    </span>
+                  )}
+                  <span style={{color:T.muted,fontSize:11}}>{m.date}</span>
+                </div>
+              </div>
+
+              {/* Predictions table */}
+              {preds.length===0?(
+                <div style={{color:T.muted,fontSize:13,padding:"8px 0"}}>No predictions submitted for this match.</div>
+              ):(
+                <div style={{display:"grid",gridTemplateColumns:"1fr auto auto",gap:"4px 16px",alignItems:"center"}}>
+                  <div style={{color:T.muted,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>Player</div>
+                  <div style={{color:T.muted,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1,textAlign:"center"}}>Pick</div>
+                  <div style={{color:T.muted,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1,textAlign:"center"}}>Pts</div>
+                  {preds.map((p,i)=>(
+                    <>
+                      <div key={`n${i}`} style={{color:T.white,fontSize:14,fontWeight:600,padding:"6px 0",borderTop:`1px solid ${T.border}`}}>{p.name}</div>
+                      <div key={`s${i}`} style={{color:T.teal,fontSize:16,fontWeight:900,fontFamily:"monospace",textAlign:"center",borderTop:`1px solid ${T.border}`,padding:"6px 0"}}>{p.h} : {p.a}</div>
+                      <div key={`p${i}`} style={{textAlign:"center",borderTop:`1px solid ${T.border}`,padding:"6px 0"}}>
+                        <span style={{
+                          background:p.pts===3?"#f5c84222":p.pts===1?"#2ecc7122":actual?"#e74c3c22":"transparent",
+                          color:p.pts===3?T.gold:p.pts===1?T.green:actual?T.red:T.muted,
+                          padding:"2px 10px",borderRadius:20,fontSize:13,fontWeight:800,
+                        }}>
+                          {actual&&actual.h!==""?`+${p.pts}`:"—"}
+                        </span>
+                      </div>
+                    </>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+          <button onClick={loadAllPredictions} style={{marginTop:8,width:"100%",padding:12,fontSize:13,fontWeight:700,background:"transparent",border:`1px solid ${T.border}`,borderRadius:10,color:T.muted,cursor:"pointer"}}>🔄 Refresh</button>
         </div>
       )}
 
