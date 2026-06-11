@@ -20,7 +20,7 @@ const provider = new GoogleAuthProvider();
 // ─── EMAILJS CONFIG ───────────────────────────────────────────────────────────
 const EMAILJS_SERVICE_ID  = "dzalles@iterla.com";
 const EMAILJS_TEMPLATE_ID = "template_33yasn5";
-const EMAILJS_PUBLIC_KEY  = "lKMwUgdBhxa_0t7sDeq1l";
+const EJS_KEY  = "lKMwUgdBhxa_0t7sDeq1l";
 
 const ADMIN_PW = "wc2026admin";
 
@@ -352,7 +352,7 @@ export default function App() {
       const s=document.createElement("script");
       s.src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js";
       s.onload=()=>{
-        window.emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+        window.emailjs.init({ publicKey: EJS_KEY });
         res();
       };
       s.onerror=rej;
