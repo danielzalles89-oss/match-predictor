@@ -18,9 +18,9 @@ const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
 // ─── EMAILJS CONFIG ───────────────────────────────────────────────────────────
-const EMAILJS_SERVICE_ID  = "dzalles@iterla.com";
+const EMAILJS_SERVICE_ID = "dzalles@iterla.com";
 const EMAILJS_TEMPLATE_ID = "template_33yasn5";
-const EJS_KEY  = "lKMwUgdBhxa_0t7sDeq1l";
+
 
 const ADMIN_PW = "wc2026admin";
 
@@ -352,7 +352,7 @@ export default function App() {
       const s=document.createElement("script");
       s.src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js";
       s.onload=()=>{
-        window.emailjs.init({ publicKey: EJS_KEY });
+        window.emailjs.init({ publicKey: "lKMwUgdBhxa_0t7sDeq1l" });
         res();
       };
       s.onerror=rej;
@@ -377,8 +377,8 @@ export default function App() {
         const body = `Hi ${player.name}!\n\nPredict today's World Cup matches:\n\n${matchLines}\n\n1 pt correct result, 3 pts exact score.\n\nGood luck!\nZalles WC 2026`;
         try {
           const result = await window.emailjs.send(
-            EMAILJS_SERVICE_ID,
-            EMAILJS_TEMPLATE_ID,
+            "dzalles@iterla.com",
+            "template_33yasn5",
             {
               to_email: player.email,
               email: player.email,
