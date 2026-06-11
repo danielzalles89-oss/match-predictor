@@ -302,49 +302,65 @@ export default function App() {
 
   async function loadAllPredictions() {
     setLoadingPreds(true);
-    const pSnap = await getDocs(collection(db,"players"));
+    // Load players + actuals in parallel
+    const [pSnap, aSnap] = await Promise.all([
+      getDocs(collection(db,"players")),
+      getDoc(doc(db,"actuals","results")),
+    ]);
     const playerList = [];
     pSnap.forEach(d=>playerList.push({id:d.id,...d.data()}));
-    const aSnap = await getDoc(doc(db,"actuals","results"));
     const cur = aSnap.exists()?aSnap.data():{};
-    // Load all predictions for all matches
-    const played = ALL_MATCHES;
+
+    // Load ALL match_predictions docs in parallel (one per player, not per match)
+    // Each player's predictions are stored in one doc keyed by matchId
+    // But since they're stored as match_predictions/{matchId}_{userId},
+    // we use getDocs on the whole collection — 1 read gets everything
+    const allPredsSnap = await getDocs(collection(db,"match_predictions"));
+    const predsByMatchPlayer = {};
+    allPredsSnap.forEach(d => {
+      predsByMatchPlayer[d.id] = d.data();
+    });
+
+    // Build result grouped by match
     const result = {};
-    for (const m of played) {
-      result[m.id] = { match: m, actual: cur[m.id]||null, preds: [] };
+    for (const m of ALL_MATCHES) {
+      const preds = [];
       for (const p of playerList) {
-        const doc2 = await getDoc(doc(db,"match_predictions",`${m.id}_${p.id}`));
-        if (doc2.exists()) {
-          const data = doc2.data();
-          const pts = calcScore(data, cur[m.id]||{});
-          result[m.id].preds.push({ name: p.name, h: data.h, a: data.a, pts });
+        const key = `${m.id}_${p.id}`;
+        const data = predsByMatchPlayer[key];
+        if (data && data.h!=="" && data.a!=="") {
+          preds.push({ name: p.name, h: data.h, a: data.a, pts: calcScore(data, cur[m.id]||{}) });
         }
       }
+      if (preds.length > 0) {
+        result[m.id] = { match: m, actual: cur[m.id]||null, preds };
+      }
     }
-    // Only keep matches that have at least one prediction
-    const filtered = {};
-    for (const [id, data] of Object.entries(result)) {
-      if (data.preds.length > 0) filtered[id] = data;
-    }
-    setAllPredictions(filtered);
+    setAllPredictions(result);
     setLoadingPreds(false);
   }
 
   async function loadLeaderboard() {
     setLoadingLb(true);
-    const aSnap = await getDoc(doc(db,"actuals","results"));
+    const [aSnap, pSnap, allPredsSnap] = await Promise.all([
+      getDoc(doc(db,"actuals","results")),
+      getDocs(collection(db,"players")),
+      getDocs(collection(db,"match_predictions")),
+    ]);
     const cur = aSnap.exists()?aSnap.data():{};
-    const pSnap = await getDocs(collection(db,"players"));
     const playerList = [];
     pSnap.forEach(d=>playerList.push({id:d.id,...d.data()}));
-    const results = await Promise.all(playerList.map(async p=>{
+    const predsByKey = {};
+    allPredsSnap.forEach(d=>{ predsByKey[d.id]=d.data(); });
+
+    const results = playerList.map(p=>{
       let total=0;
       for (const m of ALL_MATCHES) {
-        const pDoc = await getDoc(doc(db,"match_predictions",`${m.id}_${p.id}`));
-        if (pDoc.exists()) total+=calcScore(pDoc.data(),cur[m.id]||{});
+        const data = predsByKey[`${m.id}_${p.id}`];
+        if (data) total+=calcScore(data,cur[m.id]||{});
       }
       return {...p,total};
-    }));
+    });
     results.sort((a,b)=>b.total-a.total);
     setLeaderboard(results);
     setLoadingLb(false);
