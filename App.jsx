@@ -381,7 +381,8 @@ export default function App() {
             EMAILJS_TEMPLATE_ID,
             {
               to_email: player.email,
-              subject: "Predict today's WC matches!",
+              email: player.email,
+              subject: "Predict today's WC matches! WC 2026",
               message: body,
             }
           );
