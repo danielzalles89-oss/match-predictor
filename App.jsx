@@ -18,7 +18,7 @@ const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
 // ─── EMAILJS CONFIG ───────────────────────────────────────────────────────────
-const EMAILJS_SERVICE_ID  = "service_0be7ppn";
+const EMAILJS_SERVICE_ID  = "dzalles@iterla.com";
 const EMAILJS_TEMPLATE_ID = "template_33yasn5";
 const EMAILJS_PUBLIC_KEY  = "fFp98basKwYl2UL7c";
 
