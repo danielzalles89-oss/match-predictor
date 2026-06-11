@@ -531,8 +531,7 @@ export default function App() {
         <button style={navStyle("matches")} onClick={()=>setScreen("matches")}>📧 Send Emails</button>
         <button style={navStyle("players")} onClick={()=>setScreen("players")}>👥 Players</button>
         <button style={navStyle("results")} onClick={()=>setScreen("results")}>⚽ Results</button>
-        <button style={navStyle("predictions")} onClick={()=>{setScreen("predictions");loadAllPredictions();}}>🔍 Predictions</button>
-        <button style={navStyle("leaderboard")} onClick={()=>{setScreen("leaderboard");loadLeaderboard();}}>🏅 Leaderboard</button>
+        <button style={navStyle("predictions")} onClick={()=>{setScreen("predictions");loadAllPredictions();}}>🏆 Match Winners</button>
       </div>
 
       {/* ── SEND EMAILS ── */}
@@ -687,101 +686,106 @@ export default function App() {
         </div>
       )}
 
-      {/* ── PREDICTIONS VIEW ── */}
+      {/* ── MATCH WINNERS ── */}
       {screen==="predictions"&&(
         <div style={{maxWidth:700,margin:"0 auto",padding:16}}>
-          <div style={{color:T.white,fontWeight:900,fontSize:18,marginBottom:16}}>🔍 All Predictions</div>
+          <div style={{color:T.white,fontWeight:900,fontSize:18,marginBottom:4}}>🏆 Match Results</div>
+          <div style={{color:T.muted,fontSize:13,marginBottom:16}}>Who predicted the exact score for each match.</div>
           {loadingPreds?(
-            <div style={{textAlign:"center",color:T.muted,padding:40}}>Loading predictions...</div>
+            <div style={{textAlign:"center",color:T.muted,padding:40}}>Loading...</div>
           ):Object.keys(allPredictions).length===0?(
-            <div style={{textAlign:"center",color:T.muted,padding:40}}>No predictions yet — matches haven't started.</div>
-          ):Object.values(allPredictions).map(({match:m, actual, preds})=>(
-            <div key={m.id} style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:16,marginBottom:12}}>
-              {/* Match header */}
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontSize:20}}>{FLAGS[m.home]||"🏳️"}</span>
-                  <span style={{color:T.white,fontWeight:800,fontSize:15}}>{m.home} vs {m.away}</span>
-                  <span style={{fontSize:20}}>{FLAGS[m.away]||"🏳️"}</span>
-                </div>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  {actual&&actual.h!==""&&actual.a!==""?(
-                    <span style={{background:"#f5c84222",color:T.gold,padding:"3px 12px",borderRadius:20,fontWeight:900,fontSize:14,fontFamily:"monospace"}}>
-                      Result: {actual.h} : {actual.a}
-                    </span>
-                  ):(
-                    <span style={{background:"#1a3080",color:T.muted,padding:"3px 12px",borderRadius:20,fontSize:12}}>
-                      No result yet
-                    </span>
-                  )}
-                  <span style={{color:T.muted,fontSize:11}}>{m.date} · {m.time}</span>
-                </div>
-              </div>
-
-              {/* Predictions table */}
-              {preds.length===0?(
-                <div style={{color:T.muted,fontSize:13,padding:"8px 0"}}>No predictions submitted for this match.</div>
-              ):(
-                <div style={{display:"grid",gridTemplateColumns:"1fr auto auto",gap:"4px 16px",alignItems:"center"}}>
-                  <div style={{color:T.muted,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>Player</div>
-                  <div style={{color:T.muted,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1,textAlign:"center"}}>Pick</div>
-                  <div style={{color:T.muted,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1,textAlign:"center"}}>Pts</div>
-                  {preds.map((p,i)=>(
-                    <>
-                      <div key={`n${i}`} style={{color:T.white,fontSize:14,fontWeight:600,padding:"6px 0",borderTop:`1px solid ${T.border}`}}>{p.name}</div>
-                      <div key={`s${i}`} style={{color:T.teal,fontSize:16,fontWeight:900,fontFamily:"monospace",textAlign:"center",borderTop:`1px solid ${T.border}`,padding:"6px 0"}}>{p.h} : {p.a}</div>
-                      <div key={`p${i}`} style={{textAlign:"center",borderTop:`1px solid ${T.border}`,padding:"6px 0"}}>
-                        <span style={{
-                          background:p.pts===1?"#f5c84222":actual?"#e74c3c22":"transparent",
-                          color:p.pts===1?T.gold:actual?T.red:T.muted,
-                          padding:"2px 10px",borderRadius:20,fontSize:13,fontWeight:800,
-                        }}>
-                          {actual&&actual.h!==""?`+${p.pts}`:"—"}
-                        </span>
-                      </div>
-                    </>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-          <button onClick={loadAllPredictions} style={{marginTop:8,width:"100%",padding:12,fontSize:13,fontWeight:700,background:"transparent",border:`1px solid ${T.border}`,borderRadius:10,color:T.muted,cursor:"pointer"}}>🔄 Refresh</button>
-        </div>
-      )}
-
-      {/* ── LEADERBOARD ── */}
-      {screen==="leaderboard"&&(
-        <div style={{maxWidth:600,margin:"0 auto",padding:"20px 16px"}}>
-          <div style={{textAlign:"center",marginBottom:24}}>
-            <div style={{fontSize:40,filter:`drop-shadow(0 0 12px ${T.gold}66)`}}>🏆</div>
-            <h2 style={{color:T.gold,fontWeight:900,margin:"4px 0 2px",fontSize:24}}>Leaderboard</h2>
-            <div style={{color:T.muted,fontSize:13}}>Match Predictor · WC 2026</div>
-          </div>
-          {loadingLb?(
-            <div style={{textAlign:"center",color:T.muted,padding:40}}>Calculating scores...</div>
-          ):leaderboard.length===0?(
             <div style={{textAlign:"center",color:T.muted,padding:40}}>No predictions yet.</div>
-          ):leaderboard.map((p,i)=>{
-            const medals=["🥇","🥈","🥉"];
-            return(
-              <div key={p.id} style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 18px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div style={{display:"flex",alignItems:"center",gap:12}}>
-                  <span style={{fontSize:24,minWidth:32}}>{medals[i]||`#${i+1}`}</span>
-                  <div style={{width:36,height:36,background:`linear-gradient(135deg,${T.navy},${T.blue})`,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:14,color:T.teal,flexShrink:0}}>
-                    {p.name.charAt(0).toUpperCase()}
+          ):Object.values(allPredictions).map(({match:m, actual, preds})=>{
+            const hasResult = actual&&actual.h!==""&&actual.a!=="";
+            const winners = preds.filter(p=>p.pts===1);
+            const participated = preds.length;
+            return (
+              <div key={m.id} style={{
+                background:T.bgCard,
+                border:`1px solid ${winners.length>0?T.gold:T.border}`,
+                borderRadius:16,padding:18,marginBottom:12,
+                boxShadow:winners.length>0?`0 0 16px ${T.gold}33`:"none",
+              }}>
+                {/* Match header */}
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:22}}>{FLAGS[m.home]||"🏳️"}</span>
+                    <span style={{color:T.white,fontWeight:800,fontSize:15}}>{m.home} vs {m.away}</span>
+                    <span style={{fontSize:22}}>{FLAGS[m.away]||"🏳️"}</span>
                   </div>
-                  <div>
-                    <div style={{color:T.white,fontWeight:800,fontSize:15}}>{p.name}</div>
-                    <div style={{color:T.muted,fontSize:11}}>{p.email}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                    {hasResult?(
+                      <span style={{background:"#f5c84233",color:T.gold,padding:"4px 14px",borderRadius:20,fontWeight:900,fontSize:16,fontFamily:"monospace",border:`1px solid ${T.gold}44`}}>
+                        {actual.h} : {actual.a}
+                      </span>
+                    ):(
+                      <span style={{background:T.bgDeep,color:T.muted,padding:"4px 12px",borderRadius:20,fontSize:12,border:`1px solid ${T.border}`}}>
+                        ⏳ No result yet
+                      </span>
+                    )}
+                    <span style={{color:T.muted,fontSize:11}}>{m.date} · {m.time}</span>
                   </div>
                 </div>
-                <div style={{background:T.bgDeep,border:`1px solid ${T.border}`,padding:"6px 18px",borderRadius:20,color:T.gold,fontWeight:900,fontSize:20}}>
-                  {p.total}<span style={{fontSize:11,fontWeight:400,color:T.muted,marginLeft:3}}>pts</span>
+
+                {/* Winner(s) */}
+                {hasResult&&(
+                  <div style={{marginBottom:12}}>
+                    {winners.length===0?(
+                      <div style={{background:"#1a0a0a",border:"1px solid #3a1a1a",borderRadius:10,padding:"10px 14px",color:T.red,fontSize:13,fontWeight:700}}>
+                        😬 No one got the exact score
+                      </div>
+                    ):(
+                      <div style={{background:"#1a1a00",border:`1px solid ${T.gold}55`,borderRadius:10,padding:"10px 14px"}}>
+                        <div style={{color:T.gold,fontWeight:800,fontSize:12,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>
+                          🎯 Winner{winners.length>1?"s":""}
+                        </div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                          {winners.map((w,i)=>(
+                            <div key={i} style={{background:"#f5c84222",border:`1px solid ${T.gold}`,borderRadius:20,padding:"6px 16px",display:"flex",alignItems:"center",gap:6}}>
+                              <span style={{color:T.gold,fontWeight:900,fontSize:14}}>🏆 {w.name}</span>
+                              <span style={{color:T.gold,fontSize:13,fontFamily:"monospace",opacity:0.8}}>{w.h}:{w.a}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* All predictions */}
+                <div style={{borderTop:`1px solid ${T.border}`,paddingTop:10}}>
+                  <div style={{color:T.muted,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>
+                    {participated} prediction{participated!==1?"s":""}
+                  </div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {preds.map((p,i)=>{
+                      const isWinner = p.pts===1;
+                      return (
+                        <div key={i} style={{
+                          background:isWinner?"#f5c84222":hasResult?"#1a0a0a":T.bgDeep,
+                          border:`1px solid ${isWinner?T.gold:hasResult?"#3a1a1a":T.border}`,
+                          borderRadius:10,padding:"6px 12px",
+                          display:"flex",alignItems:"center",gap:6,
+                        }}>
+                          <span style={{color:isWinner?T.gold:hasResult?T.red:T.white,fontSize:13,fontWeight:700}}>{p.name}</span>
+                          <span style={{color:isWinner?T.gold:T.muted,fontSize:13,fontFamily:"monospace",fontWeight:900}}>{p.h}:{p.a}</span>
+                          {isWinner&&<span style={{fontSize:14}}>🎯</span>}
+                        </div>
+                      );
+                    })}
+                    {/* Show players who didn't predict */}
+                    {players.filter(pl=>!preds.find(p=>p.name===pl.name)).map((pl,i)=>(
+                      <div key={`np${i}`} style={{background:"#0a0a1a",border:`1px solid ${T.border}`,borderRadius:10,padding:"6px 12px",display:"flex",alignItems:"center",gap:6,opacity:0.5}}>
+                        <span style={{color:T.muted,fontSize:13}}>{pl.name}</span>
+                        <span style={{color:"#e74c3c",fontSize:10,fontWeight:700}}>NO PICK</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             );
           })}
-          <button onClick={loadLeaderboard} style={{marginTop:16,width:"100%",padding:12,fontSize:13,fontWeight:700,background:"transparent",border:`1px solid ${T.border}`,borderRadius:10,color:T.muted,cursor:"pointer"}}>🔄 Refresh</button>
+          <button onClick={loadAllPredictions} style={{marginTop:8,width:"100%",padding:12,fontSize:13,fontWeight:700,background:"transparent",border:`1px solid ${T.border}`,borderRadius:10,color:T.muted,cursor:"pointer"}}>🔄 Refresh</button>
         </div>
       )}
     </div>
