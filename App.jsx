@@ -347,20 +347,24 @@ export default function App() {
   }
 
   async function loadEmailJS() {
-    if (window.emailjs) return;
-    await new Promise((res,rej)=>{
+    return new Promise((res,rej)=>{
+      if (window.emailjs) { res(); return; }
       const s=document.createElement("script");
       s.src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js";
-      s.onload=res; s.onerror=rej;
+      s.onload=()=>{
+        window.emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+        res();
+      };
+      s.onerror=rej;
       document.head.appendChild(s);
     });
-    window.emailjs.init(EMAILJS_PUBLIC_KEY);
   }
 
   async function sendEmails() {
     if (selectedMatches.length===0) { alert("Select at least one match"); return; }
     if (players.length===0) { alert("Add players first"); return; }
     setSending(true);
+    setSendMsg("");
     try {
       await loadEmailJS();
       const matches = ALL_MATCHES.filter(m=>selectedMatches.includes(m.id));
@@ -368,25 +372,32 @@ export default function App() {
       for (const player of players) {
         const matchLines = matches.map(m=>{
           const link = buildPredictLink(player.id, player.name, m.id);
-          return `${FLAGS[m.home]||""} ${m.home} vs ${m.away} ${FLAGS[m.away]||""} (${m.date})\n👉 ${link}`;
+          return `${m.home} vs ${m.away} (${m.date}) - ${link}`;
         }).join("\n\n");
-        const body = `Hi ${player.name}! ⚽\n\nTime to predict today's World Cup matches!\n\n${matchLines}\n\n1 pt for correct result · 3 pts for exact score 🎯\n\nGood luck!\nZalles WC 2026`;
+        const body = `Hi ${player.name}!\n\nPredict today's World Cup matches:\n\n${matchLines}\n\n1 pt correct result, 3 pts exact score.\n\nGood luck!\nZalles WC 2026`;
         try {
-          await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-            to_email: player.email,
-            to_name: player.name,
-            subject: `⚽ Predict today's WC matches!`,
-            message: body,
-          });
+          const result = await window.emailjs.send(
+            EMAILJS_SERVICE_ID,
+            EMAILJS_TEMPLATE_ID,
+            {
+              to_email: player.email,
+              subject: "Predict today's WC matches!",
+              message: body,
+            }
+          );
+          console.log("Sent to", player.email, result);
           sent++;
-        } catch(e) { failed++; console.error("Failed for",player.email,e); }
+        } catch(e) {
+          failed++;
+          console.error("Failed for", player.email, JSON.stringify(e));
+        }
       }
-      setSendMsg(`✓ Sent to ${sent} players${failed>0?` (${failed} failed)`:""}`);
+      setSendMsg(sent>0 ? `✓ Sent to ${sent} player${sent!==1?"s":""}${failed>0?` (${failed} failed)`:""}` : `✗ All ${failed} failed — check console`);
     } catch(e) {
-      setSendMsg("Error loading email service. Check your connection.");
-      console.error(e);
+      console.error("EmailJS load error:", e);
+      setSendMsg("Error: Could not load email service");
     }
-    setTimeout(()=>setSendMsg(""),5000);
+    setTimeout(()=>setSendMsg(""),6000);
     setSending(false);
   }
 
