@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from "firebase/firestore";
-
+ 
 // ─── FIREBASE ─────────────────────────────────────────────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyAE_GXAmfPbKtQsHRVZl28zitk3oYHfSWI",
@@ -16,14 +16,14 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
-
+ 
 // ─── EMAILJS CONFIG ───────────────────────────────────────────────────────────
 const EMAILJS_SERVICE_ID = "dzalles@iterla.com";
 const EMAILJS_TEMPLATE_ID = "template_33yasn5";
-
-
+ 
+ 
 const ADMIN_PW = "wc2026admin";
-
+ 
 // ─── MATCHES ──────────────────────────────────────────────────────────────────
 const ALL_MATCHES = [
   { id:"G1",  date:"Jun 11", kickoff:"2026-06-11T19:00:00Z", home:"Mexico",       away:"South Africa",   group:"A" },
@@ -99,7 +99,7 @@ const ALL_MATCHES = [
   { id:"G71", date:"Jun 28", kickoff:"2026-06-28T02:00:00Z", home:"Algeria",      away:"Austria",        group:"J" },
   { id:"G72", date:"Jun 28", kickoff:"2026-06-28T02:00:00Z", home:"Jordan",       away:"Argentina",      group:"J" },
 ];
-
+ 
 const FLAGS = {
   "Mexico":"🇲🇽","South Korea":"🇰🇷","Czechia":"🇨🇿","South Africa":"🇿🇦",
   "Switzerland":"🇨🇭","Canada":"🇨🇦","Qatar":"🇶🇦","Bosnia & Herz.":"🇧🇦",
@@ -114,7 +114,7 @@ const FLAGS = {
   "Portugal":"🇵🇹","Colombia":"🇨🇴","DR Congo":"🇨🇩","Uzbekistan":"🇺🇿",
   "England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croatia":"🇭🇷","Ghana":"🇬🇭","Panama":"🇵🇦",
 };
-
+ 
 function calcScore(pred, actual) {
   if (!actual||actual.h==null||actual.a==null||actual.h===""||actual.a==="") return 0;
   if (!pred||pred.h==null||pred.a==null||pred.h===""||pred.a==="") return 0;
@@ -124,9 +124,9 @@ function calcScore(pred, actual) {
   const pw=ph>pa?"h":ph<pa?"a":"d",aw=ah>aa?"h":ah<aa?"a":"d";
   return pw===aw?1:0;
 }
-
+ 
 function isLocked(match) { return new Date() >= new Date(match.kickoff); }
-
+ 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
   bg:"#001254", bgCard:"#0a1f6e", bgDeep:"#000d3a",
@@ -135,7 +135,7 @@ const T = {
   white:"#f0f8ff", muted:"#83BAB5", border:"#1a3080",
   gold:"#f5c842", green:"#2ecc71", red:"#e74c3c",
 };
-
+ 
 function ScoreInput({h,a,onChange,disabled}) {
   const s={width:48,height:48,textAlign:"center",background:disabled?T.bgDeep:T.blue,border:`2px solid ${disabled?T.border:T.teal}`,borderRadius:10,color:disabled?"#1a3a6a":T.white,fontSize:22,fontWeight:900,fontFamily:"'Courier New',monospace",outline:"none",cursor:disabled?"not-allowed":"text"};
   return (
@@ -146,7 +146,7 @@ function ScoreInput({h,a,onChange,disabled}) {
     </div>
   );
 }
-
+ 
 // ─── PREDICT PAGE ─────────────────────────────────────────────────────────────
 function PredictPage({matchId, userId, userName}) {
   const match = ALL_MATCHES.find(m=>m.id===matchId);
@@ -155,7 +155,7 @@ function PredictPage({matchId, userId, userName}) {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(true);
   const locked = match ? isLocked(match) : false;
-
+ 
   useEffect(()=>{
     if (!match) return;
     async function load() {
@@ -167,7 +167,7 @@ function PredictPage({matchId, userId, userName}) {
     }
     load();
   },[matchId,userId]);
-
+ 
   async function handleSubmit() {
     if (pred.h===""||pred.a==="") return;
     await setDoc(doc(db,"match_predictions",`${matchId}_${userId}`),{
@@ -175,12 +175,12 @@ function PredictPage({matchId, userId, userName}) {
     });
     setSubmitted(true);
   }
-
+ 
   const pts = actual ? calcScore(pred, actual) : null;
-
+ 
   if (!match) return <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",color:T.muted,fontFamily:"sans-serif"}}>Match not found.</div>;
   if (loading) return <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",color:T.teal,fontSize:36}}>⚽</div>;
-
+ 
   return (
     <div style={{minHeight:"100vh",background:`linear-gradient(160deg,${T.navy} 0%,${T.blue} 100%)`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'Inter','Segoe UI',sans-serif"}}>
       <div style={{maxWidth:400,width:"100%"}}>
@@ -189,7 +189,7 @@ function PredictPage({matchId, userId, userName}) {
           <div style={{fontSize:32,fontWeight:900,color:T.white,letterSpacing:-0.5}}>⚽ Match Prediction</div>
           <div style={{color:T.light,fontSize:13,marginTop:4}}>Hey <strong style={{color:T.teal}}>{userName}</strong>! Pick your score before kickoff.</div>
         </div>
-
+ 
         <div style={{background:"rgba(0,33,113,0.7)",backdropFilter:"blur(10px)",border:`1px solid ${T.border}`,borderRadius:20,padding:"28px 22px",boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
           {/* Teams */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24,gap:8}}>
@@ -203,7 +203,7 @@ function PredictPage({matchId, userId, userName}) {
               <div style={{color:T.white,fontWeight:800,fontSize:15}}>{match.away}</div>
             </div>
           </div>
-
+ 
           {/* Input area */}
           {locked ? (
             <div style={{textAlign:"center",padding:20,background:"rgba(231,76,60,0.1)",borderRadius:12,border:"1px solid rgba(231,76,60,0.3)",marginBottom:12}}>
@@ -231,7 +231,7 @@ function PredictPage({matchId, userId, userName}) {
               </button>
             </>
           )}
-
+ 
           {/* Result */}
           {actual && (
             <div style={{textAlign:"center",marginTop:12,padding:16,background:"rgba(0,13,58,0.8)",borderRadius:12,border:`1px solid ${T.border}`}}>
@@ -250,7 +250,7 @@ function PredictPage({matchId, userId, userName}) {
     </div>
   );
 }
-
+ 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [user, setUser] = useState(null);
@@ -270,16 +270,16 @@ export default function App() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loadingLb, setLoadingLb] = useState(false);
   const [selectedMatches, setSelectedMatches] = useState([]);
-
+ 
   const urlParams = new URLSearchParams(window.location.search);
   const predictMatchId = urlParams.get("match");
   const predictUserId = urlParams.get("uid");
   const predictUserName = urlParams.get("name");
-
+ 
   if (predictMatchId && predictUserId) {
     return <PredictPage matchId={predictMatchId} userId={predictUserId} userName={decodeURIComponent(predictUserName||"Friend")}/>;
   }
-
+ 
   useEffect(()=>{
     const unsub = onAuthStateChanged(auth, async u => {
       setUser(u); setAuthLoading(false);
@@ -287,19 +287,19 @@ export default function App() {
     });
     return unsub;
   },[]);
-
+ 
   async function loadPlayers() {
     const snap = await getDocs(collection(db,"players"));
     const list = [];
     snap.forEach(d=>list.push({id:d.id,...d.data()}));
     setPlayers(list);
   }
-
+ 
   async function loadActuals() {
     const snap = await getDoc(doc(db,"actuals","results"));
     if (snap.exists()) setActuals(snap.data());
   }
-
+ 
   async function loadLeaderboard() {
     setLoadingLb(true);
     const aSnap = await getDoc(doc(db,"actuals","results"));
@@ -319,7 +319,7 @@ export default function App() {
     setLeaderboard(results);
     setLoadingLb(false);
   }
-
+ 
   async function addPlayer() {
     if (!newName.trim()||!newEmail.trim()) return;
     const id = newEmail.toLowerCase().replace(/[^a-z0-9]/g,"_");
@@ -327,12 +327,12 @@ export default function App() {
     setNewName(""); setNewEmail("");
     await loadPlayers();
   }
-
+ 
   async function removePlayer(id) {
     await deleteDoc(doc(db,"players",id));
     await loadPlayers();
   }
-
+ 
   async function saveActuals() {
     setSaving(true);
     await setDoc(doc(db,"actuals","results"),actuals);
@@ -340,15 +340,18 @@ export default function App() {
     setTimeout(()=>setSaveMsg(""),2500);
     setSaving(false);
   }
-
+ 
   function buildPredictLink(playerId, playerName, matchId) {
     const base = window.location.origin + window.location.pathname;
     return `${base}?match=${matchId}&uid=${playerId}&name=${encodeURIComponent(playerName)}`;
   }
-
+ 
   async function loadEmailJS() {
     return new Promise((res,rej)=>{
-      if (window.emailjs) { res(); return; }
+      if (window.emailjs) {
+        window.emailjs.init("lKMwUgdBhxa_0t7sDeq1l");
+        res(); return;
+      }
       const s=document.createElement("script");
       s.src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js";
       s.onload=()=>{
@@ -359,7 +362,7 @@ export default function App() {
       document.head.appendChild(s);
     });
   }
-
+ 
   async function sendEmails() {
     if (selectedMatches.length===0) { alert("Select at least one match"); return; }
     if (players.length===0) { alert("Add players first"); return; }
@@ -401,14 +404,14 @@ export default function App() {
     setTimeout(()=>setSendMsg(""),6000);
     setSending(false);
   }
-
+ 
   function handleAdminLogin() {
     if (adminPwInput===ADMIN_PW) { setIsAdmin(true); setShowAdminPw(false); setAdminPwInput(""); }
     else { alert("Wrong password"); setAdminPwInput(""); }
   }
-
+ 
   if (authLoading) return <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",color:T.teal,fontSize:36}}>⚽</div>;
-
+ 
   if (!user) return (
     <div style={{minHeight:"100vh",background:`linear-gradient(160deg,${T.navy},${T.blue})`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'Inter','Segoe UI',sans-serif"}}>
       <div style={{maxWidth:400,width:"100%",textAlign:"center"}}>
@@ -438,10 +441,10 @@ export default function App() {
       </div>
     </div>
   );
-
+ 
   const upcomingMatches = ALL_MATCHES.filter(m=>!isLocked(m));
   const playedMatches = ALL_MATCHES.filter(m=>isLocked(m));
-
+ 
   const navStyle = (key) => ({
     padding:"8px 16px", borderRadius:8, border:"none", cursor:"pointer",
     fontSize:13, fontWeight:700, whiteSpace:"nowrap",
@@ -449,7 +452,7 @@ export default function App() {
     color:screen===key?T.teal:T.muted,
     borderBottom:screen===key?`2px solid ${T.teal}`:"2px solid transparent",
   });
-
+ 
   return (
     <div style={{minHeight:"100vh",background:T.bg,color:T.white,fontFamily:"'Inter','Segoe UI',sans-serif"}}>
       {/* Header */}
@@ -466,7 +469,7 @@ export default function App() {
           <button onClick={()=>{signOut(auth);setUser(null);setIsAdmin(false);}} style={{background:"none",border:`1px solid ${T.border}`,color:T.muted,borderRadius:6,padding:"5px 12px",cursor:"pointer",fontSize:12}}>Sign out</button>
         </div>
       </div>
-
+ 
       {/* Nav */}
       <div style={{display:"flex",gap:2,padding:"10px 12px",background:T.bgDeep,borderBottom:`1px solid ${T.border}`,overflowX:"auto"}}>
         <button style={navStyle("matches")} onClick={()=>setScreen("matches")}>📧 Send Emails</button>
@@ -474,7 +477,7 @@ export default function App() {
         <button style={navStyle("results")} onClick={()=>setScreen("results")}>⚽ Results</button>
         <button style={navStyle("leaderboard")} onClick={()=>{setScreen("leaderboard");loadLeaderboard();}}>🏅 Leaderboard</button>
       </div>
-
+ 
       {/* ── SEND EMAILS ── */}
       {screen==="matches"&&(
         <div style={{maxWidth:660,margin:"0 auto",padding:16}}>
@@ -482,7 +485,7 @@ export default function App() {
             <div style={{color:T.teal,fontWeight:800,fontSize:15,marginBottom:4}}>📧 Send Prediction Emails via Outlook</div>
             <div style={{color:T.muted,fontSize:13}}>Select matches → send personal prediction links to all {players.length} player{players.length!==1?"s":""}.</div>
           </div>
-
+ 
           {upcomingMatches.length===0?(
             <div style={{textAlign:"center",color:T.muted,padding:40}}>All group stage matches have started.</div>
           ):(
@@ -507,7 +510,7 @@ export default function App() {
               })}
             </>
           )}
-
+ 
           <div style={{marginTop:20,display:"flex",alignItems:"center",gap:12}}>
             <button onClick={sendEmails} disabled={sending||selectedMatches.length===0||players.length===0}
               style={{flex:1,padding:14,fontSize:15,fontWeight:900,background:selectedMatches.length===0||players.length===0?T.bgCard:`linear-gradient(135deg,${T.teal},#178a84)`,color:selectedMatches.length===0||players.length===0?T.muted:"#fff",border:"none",borderRadius:12,cursor:selectedMatches.length===0||players.length===0?"not-allowed":"pointer",opacity:sending?0.6:1}}>
@@ -517,7 +520,7 @@ export default function App() {
           {sendMsg&&<div style={{color:T.green,fontWeight:800,textAlign:"center",marginTop:12,fontSize:14}}>{sendMsg}</div>}
         </div>
       )}
-
+ 
       {/* ── PLAYERS ── */}
       {screen==="players"&&(
         <div style={{maxWidth:600,margin:"0 auto",padding:16}}>
@@ -550,7 +553,7 @@ export default function App() {
           ))}
         </div>
       )}
-
+ 
       {/* ── RESULTS ── */}
       {screen==="results"&&(
         <div style={{maxWidth:660,margin:"0 auto",padding:16}}>
@@ -583,7 +586,7 @@ export default function App() {
           )}
         </div>
       )}
-
+ 
       {/* ── LEADERBOARD ── */}
       {screen==="leaderboard"&&(
         <div style={{maxWidth:600,margin:"0 auto",padding:"20px 16px"}}>
