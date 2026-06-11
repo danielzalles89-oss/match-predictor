@@ -309,8 +309,8 @@ export default function App() {
     pSnap.forEach(d=>playerList.push({id:d.id,...d.data()}));
     const aSnap = await getDoc(doc(db,"actuals","results"));
     const cur = aSnap.exists()?aSnap.data():{};
-    // Load all predictions for played matches
-    const played = ALL_MATCHES.filter(m=>isLocked(m));
+    // Load all predictions for all matches
+    const played = ALL_MATCHES;
     const result = {};
     for (const m of played) {
       result[m.id] = { match: m, actual: cur[m.id]||null, preds: [] };
@@ -323,7 +323,12 @@ export default function App() {
         }
       }
     }
-    setAllPredictions(result);
+    // Only keep matches that have at least one prediction
+    const filtered = {};
+    for (const [id, data] of Object.entries(result)) {
+      if (data.preds.length > 0) filtered[id] = data;
+    }
+    setAllPredictions(filtered);
     setLoadingPreds(false);
   }
 
