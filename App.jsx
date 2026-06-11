@@ -352,7 +352,7 @@ export default function App() {
       const s=document.createElement("script");
       s.src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js";
       s.onload=()=>{
-        window.emailjs.init({ publicKey: "lKMwUgdBhxa_0t7sDeq1l" });
+        window.emailjs.init("lKMwUgdBhxa_0t7sDeq1l");
         res();
       };
       s.onerror=rej;
