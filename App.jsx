@@ -373,11 +373,21 @@ export default function App() {
       const matches = ALL_MATCHES.filter(m=>selectedMatches.includes(m.id));
       let sent=0, failed=0;
       for (const player of players) {
-        const matchLines = matches.map(m=>{
+        const matchButtons = matches.map(m=>{
           const link = buildPredictLink(player.id, player.name, m.id);
-          return `${m.home} vs ${m.away} (${m.date}) - ${link}`;
-        }).join("\n\n");
-        const body = `Hi ${player.name}!\n\nPredict today's World Cup matches:\n\n${matchLines}\n\n1 pt correct result, 3 pts exact score.\n\nGood luck!\nZalles WC 2026`;
+          return `<div style="margin-bottom:16px;background:#0a1f6e;border-radius:10px;padding:16px;border:1px solid #1a3080">
+  <div style="font-size:15px;font-weight:bold;color:#f0f8ff;margin-bottom:10px">${FLAGS[m.home]||""} ${m.home} vs ${m.away} ${FLAGS[m.away]||""}</div>
+  <a href="${link}" style="display:inline-block;background:#20B2AA;color:#ffffff;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:14px">⚽ Predict this match</a>
+</div>`;
+        }).join("\n");
+
+        const htmlBody = `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;background:#001254;color:#f0f8ff;padding:24px;border-radius:12px">
+  <h2 style="color:#20B2AA;margin:0 0 4px">⚽ WC 2026 Match Predictor</h2>
+  <p style="color:#83BAB5;margin:0 0 20px">Hi ${player.name}! Pick your scores before kickoff.</p>
+  ${matchButtons}
+  <p style="color:#83BAB5;font-size:12px;margin-top:20px">✓ Correct result = 1 pt &nbsp;·&nbsp; 🎯 Exact score = 3 pts</p>
+  <p style="color:#4a7a8a;font-size:11px">Zalles WC 2026 Quiniela</p>
+</div>`;
         try {
           const result = await window.emailjs.send(
             "dzalles@iterla.com",
@@ -385,8 +395,8 @@ export default function App() {
             {
               to_email: player.email,
               email: player.email,
-              subject: "Predict today's WC matches! WC 2026",
-              message: body,
+              subject: "⚽ Predict today's WC matches!",
+              message: htmlBody,
             }
           );
           console.log("Sent to", player.email, result);
