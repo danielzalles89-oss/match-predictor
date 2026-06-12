@@ -1,5 +1,5 @@
-// Run this once with: node upload-quiniela-to-firebase.js
-// It uploads all Excel quiniela predictions to Firebase
+  - name: Upload Excel predictions to Firebase
+        run: node --input-type=commonjs < upload-quiniela-to-firebase.js
 
 const https = require('https');
 const fs = require('fs');
