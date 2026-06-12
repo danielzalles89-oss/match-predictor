@@ -328,21 +328,6 @@ jobs:
               }
             } catch(e) { console.error('MP preds error:', e.message); }
 
-            // Excel Quiniela predictions
-            let excelPreds = {};
-            try {
-              const snap = await firestoreGet('excel_quiniela');
-              for (const doc of (snap.documents||[])) {
-                const data = {};
-                for (const [k,v] of Object.entries(doc.fields||{})) {
-                  data[k] = fromFs(v);
-                }
-                const email = data.email;
-                if (!excelPreds[email]) excelPreds[email] = [];
-                excelPreds[email].push({ name: data.name, preds: data.predictions||{} });
-              }
-            } catch(e) { console.error('Excel preds error:', e.message); }
-
             // 6. For each newly finished match, find MP winner + send email
             // Get list of newly finished games
             const newlyFinished = [];
