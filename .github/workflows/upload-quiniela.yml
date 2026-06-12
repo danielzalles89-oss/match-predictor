@@ -1,0 +1,12 @@
+name: Upload Quiniela to Firebase
+
+on:
+  workflow_dispatch:
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Upload Excel predictions to Firebase
+        run: node upload-quiniela-to-firebase.js
