@@ -461,6 +461,151 @@ export default function App() {
     setSending(false);
   }
 
+  const [sendingLb, setSendingLb] = useState(false);
+  const [sendLbMsg, setSendLbMsg] = useState("");
+
+  async function sendLeaderboardEmail() {
+    setSendingLb(true);
+    setSendLbMsg("");
+    try {
+      await loadEmailJS();
+
+      // ── Load all data in parallel ──
+      const [allPredsSnap, aSnap, pSnap, excelSnap] = await Promise.all([
+        getDocs(collection(db,"match_predictions")),
+        getDoc(doc(db,"actuals","results")),
+        getDocs(collection(db,"players")),
+        getDocs(collection(db,"excel_quiniela")),
+      ]);
+      const cur = aSnap.exists()?aSnap.data():{};
+      const playerList = [];
+      pSnap.forEach(d=>playerList.push({id:d.id,...d.data()}));
+      const predsByKey = {};
+      allPredsSnap.forEach(d=>{ predsByKey[d.id]=d.data(); });
+
+      // ── Match Predictor standings (exact score wins) ──
+      const mpStandings = playerList.map(p=>{
+        let wins=0, played=0;
+        for (const m of ALL_MATCHES) {
+          const actual = cur[m.id];
+          if (!actual||actual.h===""||actual.a==="") continue;
+          played++;
+          const data = predsByKey[`${m.id}_${p.id}`];
+          if (data && calcScore(data,actual)===1) wins++;
+        }
+        return {...p, wins, played};
+      }).sort((a,b)=>b.wins-a.wins);
+
+      // ── Excel Quiniela standings (points system) ──
+      // Scoring: Result=10, Goals=3 per team, Goal Diff=4
+      function calcQuinielaScore(pred, actual) {
+        if (!actual||actual.h===""||actual.a==="") return 0;
+        if (!pred||pred.h===""||pred.a==="") return 0;
+        const ph=Number(pred.h),pa=Number(pred.a),ah=Number(actual.h),aa=Number(actual.a);
+        if (isNaN(ph)||isNaN(pa)||isNaN(ah)||isNaN(aa)) return 0;
+        let pts=0;
+        // Correct result (winner/draw)
+        const pw=ph>pa?"h":ph<pa?"a":"d";
+        const aw=ah>aa?"h":ah<aa?"a":"d";
+        if (pw===aw) pts+=10;
+        // Exact goals team 1
+        if (ph===ah) pts+=3;
+        // Exact goals team 2
+        if (pa===aa) pts+=3;
+        // Exact goal difference
+        if ((ph-pa)===(ah-aa)) pts+=4;
+        return pts;
+      }
+
+      const excelPlayers = {};
+      excelSnap.forEach(d=>{
+        const data = d.data();
+        const email = data.email;
+        if (!excelPlayers[email]) excelPlayers[email] = [];
+        excelPlayers[email].push({name:data.name, preds:data.predictions, total:0});
+      });
+
+      // Calculate excel quiniela points
+      const excelStandings = [];
+      for (const [email, entries] of Object.entries(excelPlayers)) {
+        for (const entry of entries) {
+          let total=0;
+          for (const m of ALL_MATCHES) {
+            const actual = cur[m.id];
+            const pred = entry.preds?.[m.id];
+            total += calcQuinielaScore(pred, actual);
+          }
+          excelStandings.push({email, name:entry.name, total});
+        }
+      }
+      excelStandings.sort((a,b)=>b.total-a.total);
+
+      // ── Build combined HTML email ──
+      const medals = ["🥇","🥈","🥉"];
+
+      const mpRows = mpStandings.map((p,i)=>
+        `<tr style="border-bottom:1px solid #1a3080">
+          <td style="padding:10px 14px;color:#f0f8ff;font-weight:700">${medals[i]||`#${i+1}`} ${p.name}</td>
+          <td style="padding:10px 14px;text-align:center;color:#20B2AA;font-weight:900;font-size:18px">${p.wins}</td>
+          <td style="padding:10px 14px;text-align:center;color:#83BAB5;font-size:12px">${p.played} played</td>
+        </tr>`
+      ).join('');
+
+      const excelRows = excelStandings.map((p,i)=>
+        `<tr style="border-bottom:1px solid #1a3080">
+          <td style="padding:10px 14px;color:#f0f8ff;font-weight:700">${medals[i]||`#${i+1}`} ${p.name}</td>
+          <td style="padding:10px 14px;text-align:center;color:#f5c842;font-weight:900;font-size:18px">${p.total}</td>
+        </tr>`
+      ).join('');
+
+      const htmlBody = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#001254;color:#f0f8ff;padding:24px;border-radius:12px">
+        <h2 style="color:#20B2AA;margin:0 0 4px">⚽ WC 2026 - Combined Standings</h2>
+        <p style="color:#83BAB5;margin:0 0 24px;font-size:13px">Updated after latest results</p>
+
+        <h3 style="color:#20B2AA;font-size:14px;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px">🎯 Match Predictor — Exact Score Wins</h3>
+        <table style="width:100%;border-collapse:collapse;background:#0a1f6e;border-radius:10px;overflow:hidden;margin-bottom:24px">
+          <thead><tr style="background:#002171">
+            <th style="padding:10px 14px;text-align:left;color:#83BAB5;font-size:11px;text-transform:uppercase;letter-spacing:1px">Player</th>
+            <th style="padding:10px 14px;text-align:center;color:#83BAB5;font-size:11px;text-transform:uppercase;letter-spacing:1px">Wins</th>
+            <th style="padding:10px 14px;text-align:center;color:#83BAB5;font-size:11px;text-transform:uppercase;letter-spacing:1px">Played</th>
+          </tr></thead>
+          <tbody>${mpRows}</tbody>
+        </table>
+
+        <h3 style="color:#f5c842;font-size:14px;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px">📊 Quiniela Excel — Points System</h3>
+        <p style="color:#83BAB5;font-size:11px;margin:0 0 8px">Result=10pts · Exact goals=3pts each · Goal diff=4pts</p>
+        <table style="width:100%;border-collapse:collapse;background:#0a1f6e;border-radius:10px;overflow:hidden;margin-bottom:24px">
+          <thead><tr style="background:#002171">
+            <th style="padding:10px 14px;text-align:left;color:#83BAB5;font-size:11px;text-transform:uppercase;letter-spacing:1px">Player</th>
+            <th style="padding:10px 14px;text-align:center;color:#83BAB5;font-size:11px;text-transform:uppercase;letter-spacing:1px">Points</th>
+          </tr></thead>
+          <tbody>${excelRows}</tbody>
+        </table>
+
+        <p style="color:#4a7a8a;font-size:11px;margin-top:4px">Zalles WC 2026 · Combined Leaderboard</p>
+      </div>`;
+
+      let sent=0, failed=0;
+      for (const player of players) {
+        try {
+          await window.emailjs.send("dzalles@iterla.com","template_33yasn5",{
+            to_email: player.email,
+            email: player.email,
+            subject: "⚽ WC 2026 - Combined Standings Update",
+            message: htmlBody,
+          });
+          sent++;
+        } catch(e) { failed++; console.error(e); }
+      }
+      setSendLbMsg(`✓ Combined standings sent to ${sent} players${failed>0?` (${failed} failed)`:""}`);
+    } catch(e) {
+      setSendLbMsg("Error sending leaderboard");
+      console.error(e);
+    }
+    setTimeout(()=>setSendLbMsg(""),5000);
+    setSendingLb(false);
+  }
+
   function handleAdminLogin() {
     if (adminPwInput===ADMIN_PW) { setIsAdmin(true); setShowAdminPw(false); setAdminPwInput(""); }
     else { alert("Wrong password"); setAdminPwInput(""); }
@@ -675,12 +820,19 @@ export default function App() {
             </div>
           ))}
           {playedMatches.length>0&&(
-            <div style={{marginTop:16,display:"flex",alignItems:"center",gap:12}}>
-              <button onClick={saveActuals} disabled={saving}
-                style={{flex:1,padding:14,fontSize:15,fontWeight:900,background:`linear-gradient(135deg,${T.gold},#c9a030)`,color:T.bgDeep,border:"none",borderRadius:12,cursor:"pointer",opacity:saving?0.6:1}}>
-                {saving?"Saving...":"💾 Save Results"}
+            <div style={{marginTop:16,display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <button onClick={saveActuals} disabled={saving}
+                  style={{flex:1,padding:14,fontSize:15,fontWeight:900,background:`linear-gradient(135deg,${T.gold},#c9a030)`,color:T.bgDeep,border:"none",borderRadius:12,cursor:"pointer",opacity:saving?0.6:1}}>
+                  {saving?"Saving...":"💾 Save Results"}
+                </button>
+                {saveMsg&&<span style={{color:T.green,fontWeight:800}}>{saveMsg}</span>}
+              </div>
+              <button onClick={sendLeaderboardEmail} disabled={sendingLb}
+                style={{width:"100%",padding:14,fontSize:15,fontWeight:900,background:`linear-gradient(135deg,${T.teal},#178a84)`,color:"#fff",border:"none",borderRadius:12,cursor:"pointer",opacity:sendingLb?0.6:1}}>
+                {sendingLb?`Sending standings...`:`📊 Send Standings to ${players.length} players`}
               </button>
-              {saveMsg&&<span style={{color:T.green,fontWeight:800}}>{saveMsg}</span>}
+              {sendLbMsg&&<div style={{color:T.green,fontWeight:800,textAlign:"center"}}>{sendLbMsg}</div>}
             </div>
           )}
         </div>
