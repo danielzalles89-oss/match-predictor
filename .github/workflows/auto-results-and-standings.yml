@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Check results and send standings
         run: |
-          node -e "
+          node --input-type=commonjs << 'NODEOF'
           const https = require('https');
 
           // ── CONFIG ──────────────────────────────────────────────
@@ -442,13 +442,15 @@ jobs:
                   '<div style=\"margin-bottom:24px\"><div style=\"color:#83BAB5;font-size:11px;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px\">' + participants.length + ' predictions</div>' +
                   predRows + '</div>' : '') +
 
-                // Excel Quiniela standings
-                '<h3 style=\"color:#f5c842;font-size:14px;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px\">📊 Quiniela Excel — Updated Standings</h3>' +
-                '<table style=\"width:100%;border-collapse:collapse;background:#0a1f6e;border-radius:10px;overflow:hidden;margin-bottom:16px\">' +
-                '<thead><tr style=\"background:#002171\">' +
-                '<th style=\"padding:10px 14px;text-align:left;color:#83BAB5;font-size:11px;text-transform:uppercase\">Player</th>' +
-                '<th style=\"padding:10px 14px;text-align:center;color:#83BAB5;font-size:11px;text-transform:uppercase\">Points</th>' +
-                '</tr></thead><tbody>' + excelRows + '</tbody></table>' +
+                // Only show Excel Quiniela standings if there ARE winners
+                (winners.length > 0 ?
+                  '<h3 style=\"color:#f5c842;font-size:14px;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px\">📊 Quiniela Excel — Updated Standings</h3>' +
+                  '<table style=\"width:100%;border-collapse:collapse;background:#0a1f6e;border-radius:10px;overflow:hidden;margin-bottom:16px\">' +
+                  '<thead><tr style=\"background:#002171\">' +
+                  '<th style=\"padding:10px 14px;text-align:left;color:#83BAB5;font-size:11px;text-transform:uppercase\">Player</th>' +
+                  '<th style=\"padding:10px 14px;text-align:center;color:#83BAB5;font-size:11px;text-transform:uppercase\">Points</th>' +
+                  '</tr></thead><tbody>' + excelRows + '</tbody></table>'
+                  : '') +
 
                 '<p style=\"color:#4a7a8a;font-size:11px\">Zalles WC 2026 · Auto-updated after each match</p>' +
                 '</div>';
