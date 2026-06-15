@@ -145,8 +145,257 @@ function ScoreInput({h,a,onChange,disabled}) {
   );
 }
 
-// ─── PREDICT PAGE ─────────────────────────────────────────────────────────────
+// ─── DAILY PREDICT PAGE ───────────────────────────────────────────────────────
+function DailyPredictPage({date, userId, userName}) {
+  const matches = ALL_MATCHES.filter(m=>m.date===date&&!isLocked(m));
+  const allMatches = ALL_MATCHES.filter(m=>m.date===date);
+  const [preds, setPreds] = useState({});
+  const [saved, setSaved] = useState({});
+  const [actuals, setActuals] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [allSaved, setAllSaved] = useState(false);
+
+  useEffect(()=>{
+    async function load() {
+      // Load existing predictions for all today's matches
+      const predPromises = allMatches.map(m=>getDoc(doc(db,"match_predictions",`${m.id}_${userId}`)));
+      const aSnap = await getDoc(doc(db,"actuals","results"));
+      const cur = aSnap.exists()?aSnap.data():{};
+      setActuals(cur);
+      const pSnaps = await Promise.all(predPromises);
+      const existingPreds = {};
+      const existingSaved = {};
+      pSnaps.forEach((snap,i)=>{
+        const m = allMatches[i];
+        if (snap.exists()) {
+          existingPreds[m.id] = {h:snap.data().h, a:snap.data().a};
+          existingSaved[m.id] = true;
+        } else {
+          existingPreds[m.id] = {h:"",a:""};
+        }
+      });
+      setPreds(existingPreds);
+      setSaved(existingSaved);
+      setLoading(false);
+    }
+    load();
+  },[date,userId]);
+
+  async function handleSubmitAll() {
+    setSubmitting(true);
+    const toSave = matches.filter(m=>preds[m.id]?.h!==""&&preds[m.id]?.a!=="");
+    await Promise.all(toSave.map(m=>
+      setDoc(doc(db,"match_predictions",`${m.id}_${userId}`),{
+        h:preds[m.id].h, a:preds[m.id].a,
+        userId, userName, matchId:m.id,
+        submittedAt: new Date().toISOString()
+      })
+    ));
+    const newSaved = {...saved};
+    toSave.forEach(m=>{ newSaved[m.id]=true; });
+    setSaved(newSaved);
+    setAllSaved(true);
+    setSubmitting(false);
+    setTimeout(()=>setAllSaved(false),3000);
+  }
+
+  const openMatches = matches.filter(m=>!isLocked(m));
+  const filledCount = openMatches.filter(m=>preds[m.id]?.h!==""&&preds[m.id]?.a!=="").length;
+
+  if (loading) return <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",color:T.teal,fontSize:36}}>⚽</div>;
+
+  return (
+    <div style={{minHeight:"100vh",background:`linear-gradient(160deg,${T.navy} 0%,${T.blue} 100%)`,padding:"20px 16px",fontFamily:"'Inter','Segoe UI',sans-serif"}}>
+      <div style={{maxWidth:480,margin:"0 auto"}}>
+        {/* Header */}
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <div style={{fontSize:11,color:T.teal,letterSpacing:4,textTransform:"uppercase",fontWeight:700,marginBottom:6}}>⚽ WC 2026 · {date}</div>
+          <div style={{fontSize:28,fontWeight:900,color:T.white,letterSpacing:-0.5}}>Today's Predictions</div>
+          <div style={{color:T.light,fontSize:13,marginTop:4}}>Hey <strong style={{color:T.teal}}>{userName}</strong>! Pick your scores for all matches.</div>
+        </div>
+
+        {/* Match cards */}
+        {allMatches.map(m=>{
+          const locked = isLocked(m);
+          const pred = preds[m.id]||{h:"",a:""};
+          const isSaved = saved[m.id];
+          const actual = actuals[m.id];
+          const hasActual = actual&&actual.h!==""&&actual.a!=="";
+          const pts = isSaved&&hasActual ? calcScore(pred,actual) : null;
+
+          return (
+            <div key={m.id} style={{
+              background:"rgba(0,33,113,0.7)",backdropFilter:"blur(10px)",
+              border:`1px solid ${pts===1?T.gold:locked?T.border:T.teal}`,
+              borderRadius:16,padding:"18px 16px",marginBottom:12,
+              boxShadow:pts===1?`0 0 16px ${T.gold}44`:"none",
+            }}>
+              {/* Match header */}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:4}}>
+                <div style={{color:T.muted,fontSize:11,fontWeight:700,letterSpacing:1}}>Group {m.group}</div>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <div style={{color:T.muted,fontSize:11}}>{m.time}</div>
+                  {locked&&<span style={{color:T.red,fontSize:10,fontWeight:700,background:"rgba(231,76,60,0.15)",padding:"2px 8px",borderRadius:20}}>🔒 LOCKED</span>}
+                  {!locked&&isSaved&&<span style={{color:T.teal,fontSize:10,fontWeight:700,background:"rgba(32,178,170,0.15)",padding:"2px 8px",borderRadius:20}}>✓ SAVED</span>}
+                </div>
+              </div>
+
+              {/* Teams + score input */}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+                <div style={{textAlign:"center",flex:1}}>
+                  <div style={{fontSize:36,marginBottom:4}}>{FLAGS[m.home]||"🏳️"}</div>
+                  <div style={{color:T.white,fontWeight:800,fontSize:13}}>{m.home}</div>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+                  <ScoreInput
+                    h={pred.h} a={pred.a}
+                    onChange={val=>setPreds(p=>({...p,[m.id]:val}))}
+                    disabled={locked}
+                  />
+                  {hasActual&&(
+                    <div style={{textAlign:"center"}}>
+                      <div style={{color:T.muted,fontSize:10,textTransform:"uppercase",letterSpacing:1}}>Result</div>
+                      <div style={{color:T.gold,fontWeight:900,fontFamily:"monospace",fontSize:16}}>{actual.h}:{actual.a}</div>
+                      {pts!==null&&<span style={{fontSize:11,fontWeight:800,color:pts===1?T.gold:T.red}}>{pts===1?"🎯 +1":"✗ 0"}</span>}
+                    </div>
+                  )}
+                </div>
+                <div style={{textAlign:"center",flex:1}}>
+                  <div style={{fontSize:36,marginBottom:4}}>{FLAGS[m.away]||"🏳️"}</div>
+                  <div style={{color:T.white,fontWeight:800,fontSize:13}}>{m.away}</div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Submit all button */}
+        {openMatches.length>0&&(
+          <div style={{position:"sticky",bottom:16,marginTop:8}}>
+            <button onClick={handleSubmitAll} disabled={submitting||filledCount===0}
+              style={{width:"100%",padding:16,fontSize:16,fontWeight:900,
+                background:filledCount===0?"rgba(255,255,255,0.05)":`linear-gradient(135deg,${T.teal},#178a84)`,
+                color:filledCount===0?T.border:"#fff",border:"none",borderRadius:14,
+                cursor:filledCount===0?"not-allowed":"pointer",
+                boxShadow:filledCount>0?"0 4px 20px rgba(32,178,170,0.4)":"none",
+                opacity:submitting?0.7:1,
+              }}>
+              {submitting?"Saving..."
+                :allSaved?"✅ All predictions saved!"
+                :`⚽ Submit ${filledCount} prediction${filledCount!==1?"s":""}`}
+            </button>
+            <div style={{textAlign:"center",marginTop:8,color:T.muted,fontSize:12}}>
+              🎯 Exact score = 1 pt · ✗ Wrong = 0 pts
+            </div>
+          </div>
+        )}
+
+        {openMatches.length===0&&(
+          <div style={{textAlign:"center",color:T.muted,padding:20}}>All matches for {date} have started.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── SINGLE MATCH PREDICT PAGE (kept for backwards compat) ────────────────────
 function PredictPage({matchId, userId, userName}) {
+  const match = ALL_MATCHES.find(m=>m.id===matchId);
+  const [pred, setPred] = useState({h:"",a:""});
+  const [actual, setActual] = useState(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const locked = match ? isLocked(match) : false;
+
+  useEffect(()=>{
+    if (!match) return;
+    async function load() {
+      const pSnap = await getDoc(doc(db,"match_predictions",`${matchId}_${userId}`));
+      if (pSnap.exists()) { setPred(pSnap.data()); setSubmitted(true); }
+      const aSnap = await getDoc(doc(db,"actuals","results"));
+      if (aSnap.exists()&&aSnap.data()[matchId]) setActual(aSnap.data()[matchId]);
+      setLoading(false);
+    }
+    load();
+  },[matchId,userId]);
+
+  async function handleSubmit() {
+    if (pred.h===""||pred.a==="") return;
+    await setDoc(doc(db,"match_predictions",`${matchId}_${userId}`),{
+      ...pred, userId, userName, matchId, submittedAt: new Date().toISOString()
+    });
+    setSubmitted(true);
+  }
+
+  const pts = actual ? calcScore(pred, actual) : null;
+
+  if (!match) return <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",color:T.muted,fontFamily:"sans-serif"}}>Match not found.</div>;
+  if (loading) return <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",color:T.teal,fontSize:36}}>⚽</div>;
+
+  return (
+    <div style={{minHeight:"100vh",background:`linear-gradient(160deg,${T.navy} 0%,${T.blue} 100%)`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'Inter','Segoe UI',sans-serif"}}>
+      <div style={{maxWidth:400,width:"100%"}}>
+        <div style={{textAlign:"center",marginBottom:20}}>
+          <div style={{fontSize:11,color:T.teal,letterSpacing:4,textTransform:"uppercase",fontWeight:700,marginBottom:6}}>Group {match.group} · {match.date}</div>
+          <div style={{fontSize:32,fontWeight:900,color:T.white,letterSpacing:-0.5}}>⚽ Match Prediction</div>
+          <div style={{color:T.light,fontSize:13,marginTop:4}}>Hey <strong style={{color:T.teal}}>{userName}</strong>! Pick your score before kickoff.</div>
+        </div>
+        <div style={{background:"rgba(0,33,113,0.7)",backdropFilter:"blur(10px)",border:`1px solid ${T.border}`,borderRadius:20,padding:"28px 22px",boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24,gap:8}}>
+            <div style={{textAlign:"center",flex:1}}>
+              <div style={{fontSize:52,marginBottom:6,filter:"drop-shadow(0 4px 8px rgba(0,0,0,0.4))"}}>{FLAGS[match.home]||"🏳️"}</div>
+              <div style={{color:T.white,fontWeight:800,fontSize:15}}>{match.home}</div>
+            </div>
+            <div style={{color:T.border,fontWeight:900,fontSize:14,letterSpacing:2}}>VS</div>
+            <div style={{textAlign:"center",flex:1}}>
+              <div style={{fontSize:52,marginBottom:6,filter:"drop-shadow(0 4px 8px rgba(0,0,0,0.4))"}}>{FLAGS[match.away]||"🏳️"}</div>
+              <div style={{color:T.white,fontWeight:800,fontSize:15}}>{match.away}</div>
+            </div>
+          </div>
+          {locked ? (
+            <div style={{textAlign:"center",padding:20,background:"rgba(231,76,60,0.1)",borderRadius:12,border:"1px solid rgba(231,76,60,0.3)",marginBottom:12}}>
+              <div style={{fontSize:28,marginBottom:6}}>🔒</div>
+              <div style={{color:T.red,fontWeight:800,fontSize:15}}>Predictions closed</div>
+              <div style={{color:T.muted,fontSize:12,marginTop:4}}>This match has already started</div>
+              {submitted&&<div style={{color:T.light,fontSize:13,marginTop:8}}>Your pick: <span style={{color:T.white,fontWeight:700,fontFamily:"monospace"}}>{pred.h} : {pred.a}</span></div>}
+            </div>
+          ) : submitted ? (
+            <div style={{textAlign:"center",padding:20,background:"rgba(32,178,170,0.1)",borderRadius:12,border:"1px solid rgba(32,178,170,0.3)",marginBottom:12}}>
+              <div style={{fontSize:28,marginBottom:6}}>✅</div>
+              <div style={{color:T.teal,fontWeight:800,fontSize:15}}>Prediction saved!</div>
+              <div style={{color:T.white,fontSize:28,fontWeight:900,margin:"10px 0",fontFamily:"'Courier New',monospace"}}>{pred.h} : {pred.a}</div>
+              <button onClick={()=>setSubmitted(false)} style={{background:"none",border:`1px solid ${T.border}`,color:T.muted,borderRadius:8,padding:"6px 16px",cursor:"pointer",fontSize:12}}>Change prediction</button>
+            </div>
+          ) : (
+            <>
+              <div style={{color:T.light,fontSize:11,textAlign:"center",marginBottom:12,letterSpacing:2,textTransform:"uppercase"}}>Your score prediction</div>
+              <div style={{display:"flex",justifyContent:"center",marginBottom:16}}>
+                <ScoreInput h={pred.h} a={pred.a} onChange={setPred} disabled={false}/>
+              </div>
+              <button onClick={handleSubmit} disabled={pred.h===""||pred.a===""}
+                style={{width:"100%",padding:16,fontSize:16,fontWeight:900,background:pred.h===""||pred.a===""?"rgba(255,255,255,0.05)":`linear-gradient(135deg,${T.teal},#178a84)`,color:pred.h===""||pred.a===""?T.border:"#fff",border:"none",borderRadius:12,cursor:pred.h===""||pred.a===""?"not-allowed":"pointer",letterSpacing:0.3}}>
+                Submit Prediction ⚽
+              </button>
+            </>
+          )}
+          {actual && (
+            <div style={{textAlign:"center",marginTop:12,padding:16,background:"rgba(0,13,58,0.8)",borderRadius:12,border:`1px solid ${T.border}`}}>
+              <div style={{color:T.light,fontSize:11,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Final Result</div>
+              <div style={{color:T.gold,fontSize:32,fontWeight:900,fontFamily:"'Courier New',monospace",marginBottom:8}}>{actual.h} : {actual.a}</div>
+              {pts!==null&&(
+                <span style={{display:"inline-block",background:pts===1?"rgba(245,200,66,0.15)":"rgba(231,76,60,0.15)",color:pts===1?T.gold:T.red,padding:"5px 18px",borderRadius:20,fontSize:13,fontWeight:800}}>
+                  {pts===1?"🎯 Exact score! +1 pt":"✗ Wrong score"}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        <div style={{textAlign:"center",marginTop:14,color:T.muted,fontSize:12}}>🎯 Exact score = 1 pt · ✗ Wrong = 0 pts</div>
+      </div>
+    </div>
+  );
+}
   const match = ALL_MATCHES.find(m=>m.id===matchId);
   const [pred, setPred] = useState({h:"",a:""});
   const [actual, setActual] = useState(null);
@@ -273,8 +522,13 @@ export default function App() {
 
   const urlParams = new URLSearchParams(window.location.search);
   const predictMatchId = urlParams.get("match");
+  const predictDate = urlParams.get("date");
   const predictUserId = urlParams.get("uid");
   const predictUserName = urlParams.get("name");
+
+  if (predictDate && predictUserId) {
+    return <DailyPredictPage date={decodeURIComponent(predictDate)} userId={predictUserId} userName={decodeURIComponent(predictUserName||"Friend")}/>;
+  }
 
   if (predictMatchId && predictUserId) {
     return <PredictPage matchId={predictMatchId} userId={predictUserId} userName={decodeURIComponent(predictUserName||"Friend")}/>;
@@ -419,13 +673,19 @@ export default function App() {
       const matches = ALL_MATCHES.filter(m=>selectedMatches.includes(m.id));
       let sent=0, failed=0;
       for (const player of players) {
-        const matchButtons = matches.map(m=>{
-          const link = buildPredictLink(player.id, player.name, m.id);
+        // Group matches by date
+        const byDate = {};
+        matches.forEach(m=>{ if(!byDate[m.date])byDate[m.date]=[]; byDate[m.date].push(m); });
+
+        const matchButtons = Object.entries(byDate).map(([date, dayMatches])=>{
+          const link = `${window.location.origin}${window.location.pathname}?date=${encodeURIComponent(date)}&uid=${player.id}&name=${encodeURIComponent(player.name)}`;
+          const matchList = dayMatches.map(m=>`${FLAGS[m.home]||''} ${m.home} vs ${m.away} ${FLAGS[m.away]||''} · ${m.time}`).join('<br>');
           return `<div style="margin-bottom:16px;background:#0a1f6e;border-radius:10px;padding:16px;border:1px solid #1a3080">
-  <div style="font-size:15px;font-weight:bold;color:#f0f8ff;margin-bottom:10px">${FLAGS[m.home]||""} ${m.home} vs ${m.away} ${FLAGS[m.away]||""}</div>
-  <a href="${link}" style="display:inline-block;background:#20B2AA;color:#ffffff;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:14px">⚽ Predict this match</a>
+  <div style="font-size:13px;font-weight:bold;color:#20B2AA;margin-bottom:8px">📅 ${date}</div>
+  <div style="font-size:13px;color:#83BAB5;margin-bottom:12px;line-height:1.8">${matchList}</div>
+  <a href="${link}" style="display:inline-block;background:#20B2AA;color:#ffffff;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:14px">⚽ Predict all ${dayMatches.length} matches</a>
 </div>`;
-        }).join("\n");
+        }).join('\n');
 
         const htmlBody = `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;background:#001254;color:#f0f8ff;padding:24px;border-radius:12px">
   <h2 style="color:#20B2AA;margin:0 0 4px">⚽ WC 2026 Match Predictor</h2>
