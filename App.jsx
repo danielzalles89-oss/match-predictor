@@ -914,7 +914,6 @@ export default function App() {
         <button style={navStyle("results")} onClick={()=>setScreen("results")}>⚽ Results</button>
         <button style={navStyle("predictions")} onClick={()=>{setScreen("predictions");loadAllPredictions();}}>🏆 Match Winners</button>
         <button style={navStyle("quinielalbp")} onClick={()=>{setScreen("quinielalbp");loadExcelLeaderboard();}}>📊 Quiniela</button>
-        <button style={navStyle("quiniela")} onClick={()=>{setScreen("quiniela");loadExcelLeaderboard();}}>📊 Quiniela</button>
       </div>
 
       {/* ── SEND EMAILS ── */}
