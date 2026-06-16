@@ -420,6 +420,11 @@ export default function App() {
   const [loadingPreds, setLoadingPreds] = useState(false);
   const [excelLb, setExcelLb] = useState([]);
   const [loadingExcelLb, setLoadingExcelLb] = useState(false);
+  const [cuentasData, setCuentasData] = useState(null);
+  const [loadingCuentas, setLoadingCuentas] = useState(false);
+  const [selectedWeek, setSelectedWeek] = useState(0);
+  const [sendingCuentas, setSendingCuentas] = useState(false);
+  const [sendCuentasMsg, setSendCuentasMsg] = useState("");
 
   const urlParams = new URLSearchParams(window.location.search);
   const predictMatchId = urlParams.get("match");
@@ -584,16 +589,188 @@ export default function App() {
     const standings = [];
     excelSnap.forEach(d=>{
       const data = d.data();
-      let total=0;
+      let total=0, resTotal=0, goalsTotal=0, diffTotal=0;
       for (const m of ALL_MATCHES) {
         const pred = data.predictions?.[m.id];
-        if (pred) total+=calcQuinielaScore({h:String(pred.h||""),a:String(pred.a||"")},cur[m.id]||{});
+        const actual = cur[m.id];
+        if (!pred||!actual||actual.h===""||actual.a==="") continue;
+        const ph=Number(pred.h),pa=Number(pred.a),ah=Number(actual.h),aa=Number(actual.a);
+        if (isNaN(ph)||isNaN(pa)||isNaN(ah)||isNaN(aa)) continue;
+        const pw=ph>pa?"h":ph<pa?"a":"d",aw=ah>aa?"h":ah<aa?"a":"d";
+        if(pw===aw){total+=10;resTotal+=10;}
+        if(ph===ah){total+=3;goalsTotal+=3;}
+        if(pa===aa){total+=3;goalsTotal+=3;}
+        if((ph-pa)===(ah-aa)){total+=4;diffTotal+=4;}
       }
-      standings.push({name:data.name, email:data.email, total});
+      standings.push({name:data.name, email:data.email, total, predictions:data.predictions||{}, breakdown:{result:resTotal,goals:goalsTotal,diff:diffTotal}});
     });
     standings.sort((a,b)=>b.total-a.total);
     setExcelLb(standings);
     setLoadingExcelLb(false);
+  }
+
+  // ── CUENTAS (ACCOUNTING) ──────────────────────────────────────────────────
+  const WEEKS = [
+    { label:"Semana 1", dates:["Jun 11","Jun 12","Jun 13","Jun 14","Jun 15","Jun 16","Jun 17"] },
+    { label:"Semana 2", dates:["Jun 18","Jun 19","Jun 20","Jun 21","Jun 22","Jun 23","Jun 24"] },
+    { label:"Semana 3", dates:["Jun 25","Jun 26","Jun 27","Jun 28","Jun 29","Jun 30","Jul 1"] },
+    { label:"Semana 4", dates:["Jul 2","Jul 3","Jul 4","Jul 5","Jul 6","Jul 7","Jul 8"] },
+    { label:"Semana 5", dates:["Jul 9","Jul 10","Jul 11","Jul 12","Jul 13","Jul 14","Jul 15"] },
+    { label:"Semana 6", dates:["Jul 16","Jul 17","Jul 18","Jul 19"] },
+  ];
+
+  async function loadCuentas(weekIdx) {
+    setLoadingCuentas(true);
+    const [allPredsSnap, aSnap, pSnap] = await Promise.all([
+      getDocs(collection(db,"match_predictions")),
+      getDoc(doc(db,"actuals","results")),
+      getDocs(collection(db,"players")),
+    ]);
+    const cur = aSnap.exists()?aSnap.data():{};
+    const playerList = [];
+    pSnap.forEach(d=>playerList.push({id:d.id,...d.data()}));
+    const predsByKey = {};
+    allPredsSnap.forEach(d=>{ predsByKey[d.id]=d.data(); });
+
+    const week = WEEKS[weekIdx];
+    const weekMatches = ALL_MATCHES.filter(m=>week.dates.includes(m.date)&&cur[m.id]&&cur[m.id].h!==""&&cur[m.id].a!=="");
+
+    const matchResults = weekMatches.map(m=>{
+      const actual = cur[m.id];
+      const predictors = [], winners = [];
+      for (const p of playerList) {
+        const pred = predsByKey[`${m.id}_${p.id}`];
+        if (pred&&pred.h!==""&&pred.a!=="") {
+          predictors.push(p);
+          if (calcScore(pred,actual)===1) winners.push(p);
+        }
+      }
+      return {match:m,actual,predictors,winners};
+    });
+
+    // Balance per player
+    const balance = {};
+    playerList.forEach(p=>{ balance[p.id]={...p,earned:0,paid:0,net:0}; });
+
+    for (const {predictors,winners} of matchResults) {
+      if (winners.length===0) continue;
+      const losers = predictors.filter(p=>!winners.find(w=>w.id===p.id));
+      const prizePerWinner = losers.length/winners.length;
+      for (const loser of losers) { balance[loser.id].paid+=1; balance[loser.id].net-=1; }
+      for (const winner of winners) {
+        balance[winner.id].earned+=prizePerWinner;
+        balance[winner.id].paid+=1;
+        balance[winner.id].net+=(prizePerWinner-1);
+      }
+    }
+
+    const balanceList = Object.values(balance).sort((a,b)=>b.net-a.net);
+
+    // Settlements
+    const settlements = [];
+    const debtors = balanceList.filter(p=>p.net<-0.001).map(p=>({...p,rem:Math.abs(p.net)}));
+    const creditors = balanceList.filter(p=>p.net>0.001).map(p=>({...p,rem:p.net}));
+    let i=0,j=0;
+    while(i<debtors.length&&j<creditors.length) {
+      const d=debtors[i],c=creditors[j];
+      const amt=Math.min(d.rem,c.rem);
+      if(amt>0.001) settlements.push({from:d.name,to:c.name,amount:Math.round(amt*100)/100});
+      d.rem-=amt; c.rem-=amt;
+      if(d.rem<0.001)i++; if(c.rem<0.001)j++;
+    }
+
+    setCuentasData({week,matchResults,balanceList,settlements});
+    setLoadingCuentas(false);
+  }
+
+  async function sendCuentasEmail(weekIdx) {
+    if (!cuentasData) return;
+    setSendingCuentas(true); setSendCuentasMsg("");
+    try {
+      await loadEmailJS();
+      const {week,matchResults,balanceList,settlements} = cuentasData;
+      const medals=["🥇","🥈","🥉"];
+
+      const matchRows = matchResults.map(({match:m,actual,predictors,winners})=>{
+        const noWinner=winners.length===0;
+        return `<tr style="border-bottom:1px solid #1a3080">
+          <td style="padding:8px 12px;color:#f0f8ff;font-size:13px">${m.home} vs ${m.away}</td>
+          <td style="padding:8px 12px;text-align:center;color:#f5c842;font-family:monospace;font-weight:900">${actual.h}-${actual.a}</td>
+          <td style="padding:8px 12px;color:${noWinner?'#83BAB5':'#2ecc71'};font-size:12px">${noWinner?'Sin ganador':winners.map(w=>w.name).join(', ')}</td>
+          <td style="padding:8px 12px;text-align:center;color:#83BAB5;font-size:12px">${predictors.length}</td>
+        </tr>`;
+      }).join('');
+
+      const balanceRows = balanceList.map((p,i)=>{
+        const color=p.net>0?'#2ecc71':p.net<0?'#e74c3c':'#83BAB5';
+        const sign=p.net>0?'+':'';
+        return `<tr style="border-bottom:1px solid #1a3080">
+          <td style="padding:8px 12px;color:#f0f8ff;font-weight:700">${medals[i]||`#${i+1}`} ${p.name}</td>
+          <td style="padding:8px 12px;text-align:center;color:#2ecc71">+$${p.earned.toFixed(2)}</td>
+          <td style="padding:8px 12px;text-align:center;color:#e74c3c">-$${p.paid.toFixed(2)}</td>
+          <td style="padding:8px 12px;text-align:center;color:${color};font-weight:900;font-size:15px">${sign}$${Math.abs(p.net).toFixed(2)}</td>
+        </tr>`;
+      }).join('');
+
+      const settlementRows = settlements.map(s=>
+        `<tr style="border-bottom:1px solid #1a3080">
+          <td style="padding:8px 12px;color:#e74c3c;font-weight:700">${s.from}</td>
+          <td style="padding:8px 12px;text-align:center;color:#83BAB5">→</td>
+          <td style="padding:8px 12px;color:#2ecc71;font-weight:700">${s.to}</td>
+          <td style="padding:8px 12px;text-align:center;color:#f5c842;font-weight:900">$${s.amount.toFixed(2)}</td>
+        </tr>`
+      ).join('');
+
+      const htmlBody = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#001254;color:#f0f8ff;padding:24px;border-radius:12px">
+        <h2 style="color:#20B2AA;margin:0 0 4px">💰 WC 2026 Match Predictor</h2>
+        <h3 style="color:#f5c842;margin:0 0 20px;font-size:16px">${week.label} — Resumen de Cuentas</h3>
+        <h4 style="color:#83BAB5;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px">Resultados de la Semana</h4>
+        <table style="width:100%;border-collapse:collapse;background:#0a1f6e;border-radius:10px;overflow:hidden;margin-bottom:20px">
+          <thead><tr style="background:#002171">
+            <th style="padding:8px 12px;text-align:left;color:#83BAB5;font-size:11px">Partido</th>
+            <th style="padding:8px 12px;text-align:center;color:#83BAB5;font-size:11px">Result.</th>
+            <th style="padding:8px 12px;text-align:left;color:#83BAB5;font-size:11px">Ganador MP</th>
+            <th style="padding:8px 12px;text-align:center;color:#83BAB5;font-size:11px">Pred.</th>
+          </tr></thead><tbody>${matchRows}</tbody>
+        </table>
+        <h4 style="color:#83BAB5;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px">Balance Neto</h4>
+        <table style="width:100%;border-collapse:collapse;background:#0a1f6e;border-radius:10px;overflow:hidden;margin-bottom:20px">
+          <thead><tr style="background:#002171">
+            <th style="padding:8px 12px;text-align:left;color:#83BAB5;font-size:11px">Jugador</th>
+            <th style="padding:8px 12px;text-align:center;color:#83BAB5;font-size:11px">Cobró</th>
+            <th style="padding:8px 12px;text-align:center;color:#83BAB5;font-size:11px">Pagó</th>
+            <th style="padding:8px 12px;text-align:center;color:#83BAB5;font-size:11px">Neto</th>
+          </tr></thead><tbody>${balanceRows}</tbody>
+        </table>
+        <h4 style="color:#83BAB5;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px">¿Quién le paga a quién?</h4>
+        ${settlements.length>0?
+          `<table style="width:100%;border-collapse:collapse;background:#0a1f6e;border-radius:10px;overflow:hidden;margin-bottom:20px">
+            <thead><tr style="background:#002171">
+              <th style="padding:8px 12px;text-align:left;color:#83BAB5;font-size:11px">Paga</th>
+              <th style="padding:8px 12px;text-align:center;color:#83BAB5;font-size:11px"></th>
+              <th style="padding:8px 12px;text-align:left;color:#83BAB5;font-size:11px">Recibe</th>
+              <th style="padding:8px 12px;text-align:center;color:#83BAB5;font-size:11px">Monto</th>
+            </tr></thead><tbody>${settlementRows}</tbody>
+          </table>`
+          :'<p style="color:#2ecc71;font-weight:700">✅ Todos están a mano esta semana</p>'}
+        <p style="color:#4a7a8a;font-size:11px">Zalles WC 2026 · $1 por predicción · Solo cuentan partidos con ganador</p>
+      </div>`;
+
+      let sent=0,failed=0;
+      for (const player of players) {
+        try {
+          await window.emailjs.send("dzalles@iterla.com","template_33yasn5",{
+            to_email:player.email,email:player.email,
+            subject:`💰 WC 2026 ${week.label} — Resumen de Cuentas`,
+            message:htmlBody,
+          });
+          sent++; await new Promise(r=>setTimeout(r,500));
+        } catch(e){failed++;}
+      }
+      setSendCuentasMsg(`✓ Resumen enviado a ${sent} jugadores`);
+    } catch(e){setSendCuentasMsg("Error enviando email");}
+    setTimeout(()=>setSendCuentasMsg(""),5000);
+    setSendingCuentas(false);
   }
 
   async function addPlayer() {
@@ -776,16 +953,8 @@ export default function App() {
       }
       excelStandings.sort((a,b)=>b.total-a.total);
 
-      // ── Build combined HTML email ──
+      // ── Build email — only Quiniela Excel standings ──
       const medals = ["🥇","🥈","🥉"];
-
-      const mpRows = mpStandings.map((p,i)=>
-        `<tr style="border-bottom:1px solid #1a3080">
-          <td style="padding:10px 14px;color:#f0f8ff;font-weight:700">${medals[i]||`#${i+1}`} ${p.name}</td>
-          <td style="padding:10px 14px;text-align:center;color:#20B2AA;font-weight:900;font-size:18px">${p.wins}</td>
-          <td style="padding:10px 14px;text-align:center;color:#83BAB5;font-size:12px">${p.played} played</td>
-        </tr>`
-      ).join('');
 
       const excelRows = excelStandings.map((p,i)=>
         `<tr style="border-bottom:1px solid #1a3080">
@@ -795,20 +964,8 @@ export default function App() {
       ).join('');
 
       const htmlBody = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#001254;color:#f0f8ff;padding:24px;border-radius:12px">
-        <h2 style="color:#20B2AA;margin:0 0 4px">⚽ WC 2026 - Combined Standings</h2>
-        <p style="color:#83BAB5;margin:0 0 24px;font-size:13px">Updated after latest results</p>
-
-        <h3 style="color:#20B2AA;font-size:14px;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px">🎯 Match Predictor — Exact Score Wins</h3>
-        <table style="width:100%;border-collapse:collapse;background:#0a1f6e;border-radius:10px;overflow:hidden;margin-bottom:24px">
-          <thead><tr style="background:#002171">
-            <th style="padding:10px 14px;text-align:left;color:#83BAB5;font-size:11px;text-transform:uppercase;letter-spacing:1px">Player</th>
-            <th style="padding:10px 14px;text-align:center;color:#83BAB5;font-size:11px;text-transform:uppercase;letter-spacing:1px">Wins</th>
-            <th style="padding:10px 14px;text-align:center;color:#83BAB5;font-size:11px;text-transform:uppercase;letter-spacing:1px">Played</th>
-          </tr></thead>
-          <tbody>${mpRows}</tbody>
-        </table>
-
-        <h3 style="color:#f5c842;font-size:14px;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px">📊 Quiniela Excel — Points System</h3>
+        <h2 style="color:#f5c842;margin:0 0 4px">📊 WC 2026 - Quiniela Excel</h2>
+        <p style="color:#83BAB5;margin:0 0 24px;font-size:13px">Standings updated after latest results</p>
         <p style="color:#83BAB5;font-size:11px;margin:0 0 8px">Result=10pts · Exact goals=3pts each · Goal diff=4pts</p>
         <table style="width:100%;border-collapse:collapse;background:#0a1f6e;border-radius:10px;overflow:hidden;margin-bottom:24px">
           <thead><tr style="background:#002171">
@@ -817,8 +974,7 @@ export default function App() {
           </tr></thead>
           <tbody>${excelRows}</tbody>
         </table>
-
-        <p style="color:#4a7a8a;font-size:11px;margin-top:4px">Zalles WC 2026 · Combined Leaderboard</p>
+        <p style="color:#4a7a8a;font-size:11px;margin-top:4px">Zalles WC 2026 · Match Predictor winners are sent automatically after each game</p>
       </div>`;
 
       let sent=0, failed=0;
@@ -914,6 +1070,7 @@ export default function App() {
         <button style={navStyle("results")} onClick={()=>setScreen("results")}>⚽ Results</button>
         <button style={navStyle("predictions")} onClick={()=>{setScreen("predictions");loadAllPredictions();}}>🏆 Match Winners</button>
         <button style={navStyle("quinielalbp")} onClick={()=>{setScreen("quinielalbp");loadExcelLeaderboard();}}>📊 Quiniela</button>
+        <button style={navStyle("cuentas")} onClick={()=>{setScreen("cuentas");loadCuentas(selectedWeek);}}>💰 Cuentas</button>
       </div>
 
       {/* ── SEND EMAILS ── */}
@@ -1067,7 +1224,7 @@ export default function App() {
               </div>
               <button onClick={sendLeaderboardEmail} disabled={sendingLb}
                 style={{width:"100%",padding:14,fontSize:15,fontWeight:900,background:`linear-gradient(135deg,${T.teal},#178a84)`,color:"#fff",border:"none",borderRadius:12,cursor:"pointer",opacity:sendingLb?0.6:1}}>
-                {sendingLb?`Sending standings...`:`📊 Send Standings to ${players.length} players`}
+                {sendingLb?`Sending standings...`:`📊 Send Quiniela Standings to ${players.length} players`}
               </button>
               {sendLbMsg&&<div style={{color:T.green,fontWeight:800,textAlign:"center"}}>{sendLbMsg}</div>}
             </div>
@@ -1180,37 +1337,217 @@ export default function App() {
 
       {/* ── QUINIELA EXCEL LEADERBOARD ── */}
       {screen==="quinielalbp"&&(
-        <div style={{maxWidth:600,margin:"0 auto",padding:"20px 16px"}}>
-          <div style={{textAlign:"center",marginBottom:20}}>
-            <div style={{fontSize:36}}>📊</div>
-            <h2 style={{color:T.gold,fontWeight:900,margin:"4px 0 2px",fontSize:22}}>Quiniela Excel</h2>
-            <div style={{color:T.muted,fontSize:13}}>Points system · Result=10 · Goals=3 each · Diff=4</div>
+        <div style={{maxWidth:760,margin:"0 auto",padding:"16px"}}>
+          <div style={{textAlign:"center",marginBottom:16}}>
+            <div style={{fontSize:32}}>📊</div>
+            <h2 style={{color:T.gold,fontWeight:900,margin:"4px 0 2px",fontSize:20}}>Quiniela Excel</h2>
+            <div style={{color:T.muted,fontSize:12}}>Result=10pts · Goals=3pts each · Goal Diff=4pts</div>
           </div>
           {loadingExcelLb?(
             <div style={{textAlign:"center",color:T.muted,padding:40}}>Calculating...</div>
           ):excelLb.length===0?(
             <div style={{textAlign:"center",color:T.muted,padding:40}}>No data yet — upload Excel first.</div>
-          ):excelLb.map((p,i)=>{
+          ):(()=>{
             const medals=["🥇","🥈","🥉"];
-            return(
-              <div key={i} style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"14px 18px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div style={{display:"flex",alignItems:"center",gap:12}}>
-                  <span style={{fontSize:22,minWidth:32}}>{medals[i]||`#${i+1}`}</span>
-                  <div style={{width:36,height:36,background:`linear-gradient(135deg,${T.navy},${T.blue})`,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:14,color:T.teal,flexShrink:0}}>
-                    {p.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <div style={{color:T.white,fontWeight:800,fontSize:15}}>{p.name}</div>
-                    <div style={{color:T.muted,fontSize:11}}>{p.email}</div>
-                  </div>
+            // Load actuals for breakdown
+            return (
+              <>
+                {/* Standings summary */}
+                <div style={{marginBottom:20}}>
+                  {excelLb.map((p,i)=>(
+                    <div key={i} style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"12px 16px",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <span style={{fontSize:20,minWidth:28}}>{medals[i]||`#${i+1}`}</span>
+                        <div style={{width:32,height:32,background:`linear-gradient(135deg,${T.navy},${T.blue})`,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:13,color:T.teal}}>
+                          {p.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div style={{color:T.white,fontWeight:800,fontSize:14}}>{p.name}</div>
+                          <div style={{color:T.muted,fontSize:11}}>{p.breakdown?.result||0}×R + {p.breakdown?.goals||0}×G + {p.breakdown?.diff||0}×D pts</div>
+                        </div>
+                      </div>
+                      <div style={{background:T.bgDeep,border:`1px solid ${T.border}`,padding:"5px 16px",borderRadius:20,color:T.gold,fontWeight:900,fontSize:18}}>
+                        {p.total}<span style={{fontSize:11,color:T.muted,marginLeft:3}}>pts</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div style={{background:T.bgDeep,border:`1px solid ${T.border}`,padding:"6px 18px",borderRadius:20,color:T.gold,fontWeight:900,fontSize:20}}>
-                  {p.total}<span style={{fontSize:11,fontWeight:400,color:T.muted,marginLeft:3}}>pts</span>
-                </div>
-              </div>
+
+                {/* Per-match breakdown — only played matches */}
+                <div style={{color:T.white,fontWeight:800,fontSize:14,marginBottom:10}}>Match Breakdown</div>
+                {ALL_MATCHES.filter(m=>isLocked(m)&&actuals[m.id]?.h!==""&&actuals[m.id]?.a!=="").map(m=>{
+                  const actual = actuals[m.id];
+                  if (!actual) return null;
+                  const ah=Number(actual.h), aa=Number(actual.a);
+                  const aw=ah>aa?"h":ah<aa?"a":"d";
+
+                  return (
+                    <div key={m.id} style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"12px 14px",marginBottom:8}}>
+                      {/* Match header */}
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6}}>
+                          <span style={{fontSize:16}}>{FLAGS[m.home]||"🏳️"}</span>
+                          <span style={{color:T.white,fontWeight:700,fontSize:13}}>{m.home} vs {m.away}</span>
+                          <span style={{fontSize:16}}>{FLAGS[m.away]||"🏳️"}</span>
+                        </div>
+                        <span style={{color:T.gold,fontWeight:900,fontFamily:"monospace",fontSize:15,background:"#f5c84222",padding:"2px 10px",borderRadius:20}}>
+                          {actual.h} : {actual.a}
+                        </span>
+                      </div>
+
+                      {/* Player predictions */}
+                      <div style={{display:"grid",gridTemplateColumns:"1fr auto auto auto auto",gap:"2px 8px",alignItems:"center"}}>
+                        <div style={{color:T.muted,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:1,paddingBottom:4,borderBottom:`1px solid ${T.border}`}}>Player</div>
+                        <div style={{color:T.muted,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:1,textAlign:"center",paddingBottom:4,borderBottom:`1px solid ${T.border}`}}>Pick</div>
+                        <div style={{color:T.muted,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:1,textAlign:"center",paddingBottom:4,borderBottom:`1px solid ${T.border}`}}>Res</div>
+                        <div style={{color:T.muted,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:1,textAlign:"center",paddingBottom:4,borderBottom:`1px solid ${T.border}`}}>Gls</div>
+                        <div style={{color:T.muted,fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:1,textAlign:"center",paddingBottom:4,borderBottom:`1px solid ${T.border}`}}>Pts</div>
+
+                        {excelLb.map((p,i)=>{
+                          const pred = p.predictions?.[m.id];
+                          if (!pred||pred.h===""||pred.a==="") return [
+                            <div key={`n${i}`} style={{color:T.muted,fontSize:12,padding:"4px 0",borderBottom:`1px solid ${T.border}22`}}>{p.name}</div>,
+                            <div key={`s${i}`} style={{color:T.muted,fontSize:11,textAlign:"center",padding:"4px 0",borderBottom:`1px solid ${T.border}22`}}>—</div>,
+                            <div key={`r${i}`} style={{padding:"4px 0",borderBottom:`1px solid ${T.border}22`}}/>,
+                            <div key={`g${i}`} style={{padding:"4px 0",borderBottom:`1px solid ${T.border}22`}}/>,
+                            <div key={`p${i}`} style={{padding:"4px 0",borderBottom:`1px solid ${T.border}22`}}/>,
+                          ];
+                          const ph=Number(pred.h),pa=Number(pred.a);
+                          const pw=ph>pa?"h":ph<pa?"a":"d";
+                          const resOk=pw===aw;
+                          const g1Ok=ph===ah, g2Ok=pa===aa;
+                          const diffOk=(ph-pa)===(ah-aa);
+                          let pts=0;
+                          if(resOk)pts+=10; if(g1Ok)pts+=3; if(g2Ok)pts+=3; if(diffOk)pts+=4;
+                          return [
+                            <div key={`n${i}`} style={{color:T.white,fontSize:12,fontWeight:600,padding:"4px 0",borderBottom:`1px solid ${T.border}22`}}>{p.name}</div>,
+                            <div key={`s${i}`} style={{color:T.teal,fontSize:13,fontWeight:900,fontFamily:"monospace",textAlign:"center",padding:"4px 0",borderBottom:`1px solid ${T.border}22`}}>{pred.h}:{pred.a}</div>,
+                            <div key={`r${i}`} style={{textAlign:"center",padding:"4px 0",borderBottom:`1px solid ${T.border}22`}}>
+                              <span style={{fontSize:11,color:resOk?T.green:T.red}}>{resOk?"✓":"✗"}</span>
+                            </div>,
+                            <div key={`g${i}`} style={{textAlign:"center",padding:"4px 0",borderBottom:`1px solid ${T.border}22`}}>
+                              <span style={{fontSize:11,color:T.muted}}>{(g1Ok?3:0)+(g2Ok?3:0)}</span>
+                            </div>,
+                            <div key={`p${i}`} style={{textAlign:"center",padding:"4px 0",borderBottom:`1px solid ${T.border}22`}}>
+                              <span style={{background:pts>0?"#f5c84222":"transparent",color:pts>0?T.gold:T.muted,padding:"1px 6px",borderRadius:10,fontSize:12,fontWeight:800}}>{pts}</span>
+                            </div>,
+                          ];
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
             );
-          })}
+          })()}
           <button onClick={loadExcelLeaderboard} style={{marginTop:8,width:"100%",padding:12,fontSize:13,fontWeight:700,background:"transparent",border:`1px solid ${T.border}`,borderRadius:10,color:T.muted,cursor:"pointer"}}>🔄 Refresh</button>
+        </div>
+      )}
+
+      {/* ── CUENTAS ── */}
+      {screen==="cuentas"&&(
+        <div style={{maxWidth:700,margin:"0 auto",padding:"16px"}}>
+          <div style={{textAlign:"center",marginBottom:16}}>
+            <div style={{fontSize:32}}>💰</div>
+            <h2 style={{color:T.gold,fontWeight:900,margin:"4px 0 2px",fontSize:20}}>Cuentas</h2>
+            <div style={{color:T.muted,fontSize:12}}>$1 por predicción · Solo cuentan partidos con ganador</div>
+          </div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center",marginBottom:16}}>
+            {WEEKS.map((w,i)=>(
+              <button key={i} onClick={()=>{setSelectedWeek(i);loadCuentas(i);}}
+                style={{padding:"6px 14px",borderRadius:20,border:`1px solid ${selectedWeek===i?T.gold:T.border}`,
+                  background:selectedWeek===i?"#f5c84222":"transparent",
+                  color:selectedWeek===i?T.gold:T.muted,fontWeight:700,fontSize:12,cursor:"pointer"}}>
+                {w.label}
+              </button>
+            ))}
+          </div>
+          {loadingCuentas?(
+            <div style={{textAlign:"center",color:T.muted,padding:40}}>Calculando...</div>
+          ):!cuentasData?(
+            <div style={{textAlign:"center",color:T.muted,padding:40}}>Selecciona una semana</div>
+          ):(()=>{
+            const {week,matchResults,balanceList,settlements}=cuentasData;
+            const medals=["🥇","🥈","🥉"];
+            const playedWithWinner=matchResults.filter(r=>r.winners.length>0);
+            const totalPot=playedWithWinner.reduce((sum,r)=>sum+r.predictors.length,0);
+            return(
+              <>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
+                  {[["Partidos",matchResults.length,T.border,T.white],["Con ganador",playedWithWinner.length,T.gold+"44",T.gold],["Dinero en juego","$"+totalPot,"#2ecc7144","#2ecc71"]].map(([label,val,border,color])=>(
+                    <div key={label} style={{background:T.bgCard,border:`1px solid ${border}`,borderRadius:12,padding:12,textAlign:"center"}}>
+                      <div style={{color:T.muted,fontSize:11,marginBottom:4}}>{label}</div>
+                      <div style={{color,fontWeight:900,fontSize:22}}>{val}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{color:T.white,fontWeight:800,fontSize:13,marginBottom:8}}>Partido por partido</div>
+                <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden",marginBottom:16}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr auto auto auto",gap:"4px 12px",padding:"8px 12px",background:"#002171"}}>
+                    {["Partido","Result.","Ganador MP","$"].map(h=><div key={h} style={{color:T.muted,fontSize:10,fontWeight:700,textTransform:"uppercase",textAlign:h==="Partido"?"left":"center"}}>{h}</div>)}
+                  </div>
+                  {matchResults.map(({match:m,actual,predictors,winners},i)=>{
+                    const nw=winners.length===0;
+                    return(
+                      <div key={m.id} style={{display:"grid",gridTemplateColumns:"1fr auto auto auto",gap:"4px 12px",padding:"8px 12px",borderTop:`1px solid ${T.border}22`,background:i%2===0?"transparent":"#ffffff05"}}>
+                        <div style={{color:T.white,fontSize:12}}>{FLAGS[m.home]||""} {m.home} vs {m.away} {FLAGS[m.away]||""}</div>
+                        <div style={{color:T.gold,fontFamily:"monospace",fontWeight:900,textAlign:"center",fontSize:13}}>{actual.h}-{actual.a}</div>
+                        <div style={{color:nw?T.muted:"#2ecc71",fontSize:12,textAlign:"center"}}>{nw?"—":winners.map(w=>w.name).join(", ")}</div>
+                        <div style={{color:nw?T.muted:"#2ecc71",fontWeight:900,textAlign:"center",fontSize:13}}>{nw?"—":`$${predictors.length}`}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div style={{color:T.white,fontWeight:800,fontSize:13,marginBottom:8}}>Balance Neto</div>
+                <div style={{marginBottom:16}}>
+                  {balanceList.map((p,i)=>{
+                    const color=p.net>0?"#2ecc71":p.net<0?T.red:T.muted;
+                    const sign=p.net>0?"+":"";
+                    return(
+                      <div key={p.id} style={{background:T.bgCard,border:`1px solid ${p.net>0?"#2ecc7144":p.net<0?"#e74c3c44":T.border}`,borderRadius:10,padding:"10px 14px",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{fontSize:18,minWidth:26}}>{medals[i]||`#${i+1}`}</span>
+                          <div>
+                            <div style={{color:T.white,fontWeight:700,fontSize:14}}>{p.name}</div>
+                            <div style={{color:T.muted,fontSize:11}}>Cobró <span style={{color:"#2ecc71"}}>+${p.earned.toFixed(2)}</span> · Pagó <span style={{color:T.red}}>-${p.paid.toFixed(2)}</span></div>
+                          </div>
+                        </div>
+                        <div style={{color,fontWeight:900,fontSize:20}}>{sign}${Math.abs(p.net).toFixed(2)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div style={{color:T.white,fontWeight:800,fontSize:13,marginBottom:8}}>¿Quién le paga a quién?</div>
+                {settlements.length===0?(
+                  <div style={{background:"#0a2a0a",border:"1px solid #2ecc7144",borderRadius:12,padding:14,color:"#2ecc71",fontWeight:700,textAlign:"center",marginBottom:16}}>✅ Todos están a mano esta semana</div>
+                ):(
+                  <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden",marginBottom:16}}>
+                    {settlements.map((s,i)=>(
+                      <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",borderTop:i>0?`1px solid ${T.border}22`:"none"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}>
+                          <span style={{color:T.red,fontWeight:700,fontSize:14}}>{s.from}</span>
+                          <span style={{color:T.muted,fontSize:16}}>→</span>
+                          <span style={{color:"#2ecc71",fontWeight:700,fontSize:14}}>{s.to}</span>
+                        </div>
+                        <div style={{background:"#f5c84222",border:`1px solid ${T.gold}`,borderRadius:20,padding:"4px 16px",color:T.gold,fontWeight:900,fontSize:16}}>${s.amount.toFixed(2)}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <button onClick={()=>sendCuentasEmail(selectedWeek)} disabled={sendingCuentas}
+                  style={{width:"100%",padding:14,fontSize:14,fontWeight:900,
+                    background:`linear-gradient(135deg,${T.gold},#c9a030)`,
+                    color:T.bgDeep,border:"none",borderRadius:12,cursor:"pointer",opacity:sendingCuentas?0.6:1}}>
+                  {sendingCuentas?"Enviando...":`💰 Enviar resumen ${week.label} a ${players.length} jugadores`}
+                </button>
+                {sendCuentasMsg&&<div style={{color:T.green,fontWeight:800,textAlign:"center",marginTop:8}}>{sendCuentasMsg}</div>}
+              </>
+            );
+          })()}
         </div>
       )}
     </div>
