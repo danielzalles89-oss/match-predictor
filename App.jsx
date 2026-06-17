@@ -519,9 +519,9 @@ export default function App() {
       predsByMatchPlayer[d.id] = d.data();
     });
 
-    // Build result grouped by match
+    // Build result grouped by match — iterate in reverse so most recent matches appear first
     const result = {};
-    for (const m of ALL_MATCHES) {
+    for (const m of ALL_MATCHES.slice().reverse()) {
       const preds = [];
       for (const p of playerList) {
         const key = `${m.id}_${p.id}`;
@@ -632,7 +632,7 @@ export default function App() {
     allPredsSnap.forEach(d=>{ predsByKey[d.id]=d.data(); });
 
     const week = WEEKS[weekIdx];
-    const weekMatches = ALL_MATCHES.filter(m=>week.dates.includes(m.date)&&cur[m.id]&&cur[m.id].h!==""&&cur[m.id].a!=="");
+    const weekMatches = ALL_MATCHES.filter(m=>week.dates.includes(m.date)&&cur[m.id]&&cur[m.id].h!==""&&cur[m.id].a!=="").slice().reverse();
 
     const matchResults = weekMatches.map(m=>{
       const actual = cur[m.id];
@@ -1035,7 +1035,7 @@ export default function App() {
   );
 
   const upcomingMatches = ALL_MATCHES.filter(m=>!isLocked(m));
-  const playedMatches = ALL_MATCHES.filter(m=>isLocked(m));
+  const playedMatches = ALL_MATCHES.filter(m=>isLocked(m)).slice().reverse();
 
   const navStyle = (key) => ({
     padding:"8px 16px", borderRadius:8, border:"none", cursor:"pointer",
@@ -1374,7 +1374,7 @@ export default function App() {
 
                 {/* Per-match breakdown — only played matches */}
                 <div style={{color:T.white,fontWeight:800,fontSize:14,marginBottom:10}}>Match Breakdown</div>
-                {ALL_MATCHES.filter(m=>isLocked(m)&&actuals[m.id]?.h!==""&&actuals[m.id]?.a!=="").map(m=>{
+                {ALL_MATCHES.filter(m=>isLocked(m)&&actuals[m.id]?.h!==""&&actuals[m.id]?.a!=="").slice().reverse().map(m=>{
                   const actual = actuals[m.id];
                   if (!actual) return null;
                   const ah=Number(actual.h), aa=Number(actual.a);
