@@ -48,8 +48,8 @@ const ALL_MATCHES = [
   { id:"G20", date:"Jun 16", time:"11:00 PM", kickoff:"2026-06-17T04:00:00Z", home:"Austria",       away:"Jordan",         group:"J" },
   { id:"G21", date:"Jun 17", time:"12:00 PM", kickoff:"2026-06-17T17:00:00Z", home:"Portugal",      away:"DR Congo",       group:"K" },
   { id:"G22", date:"Jun 17", time:"3:00 PM",  kickoff:"2026-06-17T20:00:00Z", home:"Uzbekistan",    away:"Colombia",       group:"K" },
-  { id:"G23", date:"Jun 17", time:"5:00 PM",  kickoff:"2026-06-17T22:00:00Z", home:"England",       away:"Panama",         group:"L" },
-  { id:"G24", date:"Jun 17", time:"8:00 PM",  kickoff:"2026-06-18T01:00:00Z", home:"Ghana",         away:"Croatia",        group:"L" },
+  { id:"G23", date:"Jun 17", time:"5:00 PM",  kickoff:"2026-06-17T21:00:00Z", home:"England",       away:"Croatia",         group:"L" },
+  { id:"G24", date:"Jun 17", time:"8:00 PM",  kickoff:"2026-06-18T00:00:00Z", home:"Ghana",         away:"Panama",          group:"L" },
   { id:"G25", date:"Jun 18", time:"12:00 PM", kickoff:"2026-06-18T17:00:00Z", home:"Mexico",        away:"South Korea",    group:"A" },
   { id:"G26", date:"Jun 18", time:"3:00 PM",  kickoff:"2026-06-18T20:00:00Z", home:"Czechia",       away:"South Africa",   group:"A" },
   { id:"G27", date:"Jun 18", time:"6:00 PM",  kickoff:"2026-06-18T23:00:00Z", home:"Switzerland",   away:"Bosnia & Herz.", group:"B" },
@@ -72,8 +72,8 @@ const ALL_MATCHES = [
   { id:"G44", date:"Jun 22", time:"9:00 PM",  kickoff:"2026-06-23T02:00:00Z", home:"Norway",        away:"Senegal",        group:"I" },
   { id:"G45", date:"Jun 23", time:"12:00 PM", kickoff:"2026-06-23T17:00:00Z", home:"Portugal",      away:"Uzbekistan",     group:"K" },
   { id:"G46", date:"Jun 23", time:"3:00 PM",  kickoff:"2026-06-23T20:00:00Z", home:"Colombia",      away:"DR Congo",       group:"K" },
-  { id:"G47", date:"Jun 23", time:"6:00 PM",  kickoff:"2026-06-23T23:00:00Z", home:"England",       away:"Ghana",          group:"L" },
-  { id:"G48", date:"Jun 23", time:"9:00 PM",  kickoff:"2026-06-24T02:00:00Z", home:"Croatia",       away:"Panama",         group:"L" },
+  { id:"G47", date:"Jun 23", time:"6:00 PM",  kickoff:"2026-06-23T20:00:00Z", home:"England",       away:"Ghana",           group:"L" },
+  { id:"G48", date:"Jun 23", time:"9:00 PM",  kickoff:"2026-06-23T23:00:00Z", home:"Panama",        away:"Croatia",         group:"L" },
   { id:"G49", date:"Jun 24", time:"12:00 PM", kickoff:"2026-06-24T17:00:00Z", home:"South Korea",   away:"South Africa",   group:"A" },
   { id:"G50", date:"Jun 24", time:"3:00 PM",  kickoff:"2026-06-24T20:00:00Z", home:"Mexico",        away:"Czechia",        group:"A" },
   { id:"G51", date:"Jun 24", time:"6:00 PM",  kickoff:"2026-06-24T23:00:00Z", home:"Bosnia & Herz.",away:"Qatar",          group:"B" },
@@ -92,8 +92,8 @@ const ALL_MATCHES = [
   { id:"G64", date:"Jun 26", time:"6:00 PM",  kickoff:"2026-06-26T23:00:00Z", home:"Uruguay",       away:"Spain",          group:"H" },
   { id:"G65", date:"Jun 26", time:"9:00 PM",  kickoff:"2026-06-27T02:00:00Z", home:"Egypt",         away:"Iran",           group:"G" },
   { id:"G66", date:"Jun 26", time:"9:00 PM",  kickoff:"2026-06-27T02:00:00Z", home:"New Zealand",   away:"Belgium",        group:"G" },
-  { id:"G67", date:"Jun 27", time:"4:00 PM",  kickoff:"2026-06-27T21:00:00Z", home:"Panama",        away:"England",        group:"L" },
-  { id:"G68", date:"Jun 27", time:"4:00 PM",  kickoff:"2026-06-27T21:00:00Z", home:"Croatia",       away:"Ghana",          group:"L" },
+  { id:"G67", date:"Jun 27", time:"4:00 PM",  kickoff:"2026-06-27T20:00:00Z", home:"Panama",        away:"England",         group:"L" },
+  { id:"G68", date:"Jun 27", time:"4:00 PM",  kickoff:"2026-06-27T20:00:00Z", home:"Croatia",       away:"Ghana",           group:"L" },
   { id:"G69", date:"Jun 27", time:"6:30 PM",  kickoff:"2026-06-27T23:30:00Z", home:"Colombia",      away:"Portugal",       group:"K" },
   { id:"G70", date:"Jun 27", time:"6:30 PM",  kickoff:"2026-06-27T23:30:00Z", home:"DR Congo",      away:"Uzbekistan",     group:"K" },
   { id:"G71", date:"Jun 27", time:"9:00 PM",  kickoff:"2026-06-28T02:00:00Z", home:"Algeria",       away:"Austria",        group:"J" },
@@ -611,12 +611,11 @@ export default function App() {
 
   // ── CUENTAS (ACCOUNTING) ──────────────────────────────────────────────────
   const WEEKS = [
-    { label:"Semana 1", dates:["Jun 11","Jun 12","Jun 13","Jun 14","Jun 15","Jun 16","Jun 17"] },
-    { label:"Semana 2", dates:["Jun 18","Jun 19","Jun 20","Jun 21","Jun 22","Jun 23","Jun 24"] },
-    { label:"Semana 3", dates:["Jun 25","Jun 26","Jun 27","Jun 28","Jun 29","Jun 30","Jul 1"] },
-    { label:"Semana 4", dates:["Jul 2","Jul 3","Jul 4","Jul 5","Jul 6","Jul 7","Jul 8"] },
-    { label:"Semana 5", dates:["Jul 9","Jul 10","Jul 11","Jul 12","Jul 13","Jul 14","Jul 15"] },
-    { label:"Semana 6", dates:["Jul 16","Jul 17","Jul 18","Jul 19"] },
+    { label:"Semana 1 (desde Jun 17)", dates:["Jun 17","Jun 18","Jun 19","Jun 20","Jun 21","Jun 22","Jun 23"] },
+    { label:"Semana 2", dates:["Jun 24","Jun 25","Jun 26","Jun 27","Jun 28","Jun 29","Jun 30"] },
+    { label:"Semana 3", dates:["Jul 1","Jul 2","Jul 3","Jul 4","Jul 5","Jul 6","Jul 7"] },
+    { label:"Semana 4", dates:["Jul 8","Jul 9","Jul 10","Jul 11","Jul 12","Jul 13","Jul 14"] },
+    { label:"Semana 5", dates:["Jul 15","Jul 16","Jul 17","Jul 18","Jul 19"] },
   ];
 
   async function loadCuentas(weekIdx) {
