@@ -658,24 +658,27 @@ export default function App() {
       for (const loser of losers) { balance[loser.id].paid+=1; balance[loser.id].net-=1; }
       for (const winner of winners) {
         balance[winner.id].earned+=prizePerWinner;
-        balance[winner.id].paid+=1;
-        balance[winner.id].net+=(prizePerWinner-1);
+        balance[winner.id].net+=prizePerWinner;
       }
     }
 
     const balanceList = Object.values(balance).sort((a,b)=>b.net-a.net);
 
-    // Settlements
+    // Settlements — minimum cash flow algorithm (fixed: use indices that don't skip entries)
     const settlements = [];
-    const debtors = balanceList.filter(p=>p.net<-0.001).map(p=>({...p,rem:Math.abs(p.net)}));
-    const creditors = balanceList.filter(p=>p.net>0.001).map(p=>({...p,rem:p.net}));
-    let i=0,j=0;
-    while(i<debtors.length&&j<creditors.length) {
-      const d=debtors[i],c=creditors[j];
-      const amt=Math.min(d.rem,c.rem);
-      if(amt>0.001) settlements.push({from:d.name,to:c.name,amount:Math.round(amt*100)/100});
-      d.rem-=amt; c.rem-=amt;
-      if(d.rem<0.001)i++; if(c.rem<0.001)j++;
+    const debtors = balanceList.filter(p=>p.net<-0.001).map(p=>({name:p.name,rem:Math.abs(p.net)}));
+    const creditors = balanceList.filter(p=>p.net>0.001).map(p=>({name:p.name,rem:p.net}));
+    let di=0, ci=0;
+    while (di<debtors.length && ci<creditors.length) {
+      const d=debtors[di], c=creditors[ci];
+      const amt = Math.min(d.rem, c.rem);
+      if (amt > 0.001) {
+        settlements.push({from:d.name, to:c.name, amount:Math.round(amt*100)/100});
+      }
+      d.rem -= amt;
+      c.rem -= amt;
+      if (d.rem <= 0.001) di++;
+      if (c.rem <= 0.001) ci++;
     }
 
     setCuentasData({week,matchResults,balanceList,settlements});
@@ -1194,7 +1197,25 @@ export default function App() {
       {/* ── RESULTS ── */}
       {screen==="results"&&(
         <div style={{maxWidth:660,margin:"0 auto",padding:16}}>
-          <div style={{color:T.white,fontWeight:900,fontSize:18,marginBottom:16}}>⚽ Enter Results</div>
+          <div style={{color:T.white,fontWeight:900,fontSize:18,marginBottom:12}}>⚽ Enter Results</div>
+
+          {playedMatches.length>0&&(
+            <div style={{position:"sticky",top:0,zIndex:10,background:T.bgDeep,paddingBottom:12,marginBottom:12,borderBottom:`1px solid ${T.border}`}}>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
+                <button onClick={saveActuals} disabled={saving}
+                  style={{flex:1,padding:14,fontSize:15,fontWeight:900,background:`linear-gradient(135deg,${T.gold},#c9a030)`,color:T.bgDeep,border:"none",borderRadius:12,cursor:"pointer",opacity:saving?0.6:1}}>
+                  {saving?"Saving...":"💾 Save Results"}
+                </button>
+                {saveMsg&&<span style={{color:T.green,fontWeight:800}}>{saveMsg}</span>}
+              </div>
+              <button onClick={sendLeaderboardEmail} disabled={sendingLb}
+                style={{width:"100%",padding:14,fontSize:15,fontWeight:900,background:`linear-gradient(135deg,${T.teal},#178a84)`,color:"#fff",border:"none",borderRadius:12,cursor:"pointer",opacity:sendingLb?0.6:1}}>
+                {sendingLb?`Sending standings...`:`📊 Send Quiniela Standings to ${players.length} players`}
+              </button>
+              {sendLbMsg&&<div style={{color:T.green,fontWeight:800,textAlign:"center",marginTop:8}}>{sendLbMsg}</div>}
+            </div>
+          )}
+
           {playedMatches.length===0?(
             <div style={{textAlign:"center",color:T.muted,padding:40}}>No matches have started yet.</div>
           ):playedMatches.map(m=>(
@@ -1212,22 +1233,6 @@ export default function App() {
               </div>
             </div>
           ))}
-          {playedMatches.length>0&&(
-            <div style={{marginTop:16,display:"flex",flexDirection:"column",gap:10}}>
-              <div style={{display:"flex",alignItems:"center",gap:12}}>
-                <button onClick={saveActuals} disabled={saving}
-                  style={{flex:1,padding:14,fontSize:15,fontWeight:900,background:`linear-gradient(135deg,${T.gold},#c9a030)`,color:T.bgDeep,border:"none",borderRadius:12,cursor:"pointer",opacity:saving?0.6:1}}>
-                  {saving?"Saving...":"💾 Save Results"}
-                </button>
-                {saveMsg&&<span style={{color:T.green,fontWeight:800}}>{saveMsg}</span>}
-              </div>
-              <button onClick={sendLeaderboardEmail} disabled={sendingLb}
-                style={{width:"100%",padding:14,fontSize:15,fontWeight:900,background:`linear-gradient(135deg,${T.teal},#178a84)`,color:"#fff",border:"none",borderRadius:12,cursor:"pointer",opacity:sendingLb?0.6:1}}>
-                {sendingLb?`Sending standings...`:`📊 Send Quiniela Standings to ${players.length} players`}
-              </button>
-              {sendLbMsg&&<div style={{color:T.green,fontWeight:800,textAlign:"center"}}>{sendLbMsg}</div>}
-            </div>
-          )}
         </div>
       )}
 
