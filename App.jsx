@@ -145,8 +145,8 @@ function ScoreInput({h,a,onChange,disabled}) {
   );
 }
 
-// ─── OFFLINE PLAYER PREDICTION INPUT (admin enters on their behalf) ──────────
-function OfflinePredictionInput({player, match, T, onSaved, existing}) {
+// ─── OFFLINE PLAYER PREDICTION INPUT ─────────────────────────────────────────
+function OfflinePredictionInput({player, match, onSaved, existing}) {
   const [h, setH] = useState(existing?.h ?? "");
   const [a, setA] = useState(existing?.a ?? "");
   const [saving, setSaving] = useState(false);
@@ -155,27 +155,52 @@ function OfflinePredictionInput({player, match, T, onSaved, existing}) {
   async function save() {
     if (h===""||a==="") return;
     setSaving(true);
-    await setDoc(doc(db,"match_predictions",`${match.id}_${player.id}`),{
-      h, a, userId:player.id, userName:player.name, matchId:match.id,
-      submittedAt:new Date().toISOString(),
-    });
+    try {
+      await setDoc(doc(db,"match_predictions",`${match.id}_${player.id}`),{
+        h:String(h), a:String(a),
+        userId:player.id, userName:player.name, matchId:match.id,
+        submittedAt:new Date().toISOString(),
+      });
+      setSaved(true);
+      setTimeout(()=>setSaved(false),2000);
+      if (onSaved) onSaved();
+    } catch(e){ console.error(e); }
     setSaving(false);
-    setSaved(true);
-    setTimeout(()=>setSaved(false),1500);
-    if (onSaved) await onSaved();
   }
 
+  const inputStyle = {
+    width:34, height:28, textAlign:"center",
+    background:"#001254", border:"1px solid #20B2AA",
+    borderRadius:6, color:"#fff", fontSize:14,
+    fontWeight:900, outline:"none", fontFamily:"monospace",
+  };
+
   return (
-    <div style={{background:"#f5c84211",border:`1px solid ${T.gold}66`,borderRadius:10,padding:"6px 10px",display:"flex",alignItems:"center",gap:6}}>
-      <span style={{color:T.gold,fontSize:12,fontWeight:700}}>📵 {player.name}</span>
-      <input type="number" min="0" max="99" value={h} onChange={e=>setH(e.target.value)}
-        style={{width:32,height:26,textAlign:"center",background:T.bgDeep,border:`1px solid ${T.border}`,borderRadius:6,color:T.white,fontSize:13,fontWeight:700,outline:"none"}}/>
-      <span style={{color:T.muted,fontSize:13}}>:</span>
-      <input type="number" min="0" max="99" value={a} onChange={e=>setA(e.target.value)}
-        style={{width:32,height:26,textAlign:"center",background:T.bgDeep,border:`1px solid ${T.border}`,borderRadius:6,color:T.white,fontSize:13,fontWeight:700,outline:"none"}}/>
+    <div style={{
+      background:"#f5c84211", border:"1px solid #f5c84288",
+      borderRadius:10, padding:"5px 10px",
+      display:"flex", alignItems:"center", gap:6,
+    }}>
+      <span style={{color:"#f5c842", fontSize:12, fontWeight:700}}>📵 {player.name}</span>
+      <input type="number" min="0" max="99" value={h}
+        onChange={e=>setH(e.target.value)}
+        style={inputStyle}/>
+      <span style={{color:"#83BAB5", fontSize:13}}>:</span>
+      <input type="number" min="0" max="99" value={a}
+        onChange={e=>setA(e.target.value)}
+        onKeyDown={e=>e.key==="Enter"&&save()}
+        style={inputStyle}/>
       <button onClick={save} disabled={saving||h===""||a===""}
-        style={{background:saved?"#2ecc7122":T.gold,border:"none",borderRadius:6,padding:"4px 10px",fontSize:11,fontWeight:700,color:saved?"#2ecc71":T.bgDeep,cursor:"pointer"}}>
-        {saved?"✓":"Save"}
+        style={{
+          background: saved ? "#2ecc7133" : "#f5c842",
+          border: saved ? "1px solid #2ecc71" : "none",
+          borderRadius:6, padding:"3px 10px",
+          fontSize:11, fontWeight:700,
+          color: saved ? "#2ecc71" : "#001254",
+          cursor: h===""||a===""?"not-allowed":"pointer",
+          opacity: h===""||a===""?0.5:1,
+        }}>
+        {saving ? "..." : saved ? "✓ Saved" : "Save"}
       </button>
     </div>
   );
@@ -488,7 +513,8 @@ export default function App() {
     const snap = await getDocs(collection(db,"players"));
     const list = [];
     snap.forEach(d=>list.push({id:d.id,...d.data()}));
-    setPlayers(list);
+    // Mark players without email as offline
+    setPlayers(list.map(p=>({...p, offline: p.offline||!p.email})));
   }
 
   async function loadActuals() {
@@ -555,24 +581,20 @@ export default function App() {
       predsByMatchPlayer[d.id] = d.data();
     });
 
-    // Build result grouped by match — show ALL locked matches so offline players can be entered
+    // Build result grouped by match — only show matches with results entered
     const result = {};
     for (const m of ALL_MATCHES.slice().reverse()) {
       const actual = cur[m.id];
-      if (!actual && !isLocked(m)) continue; // skip future matches with no result
+      if (!actual || actual.h==="" || actual.a==="") continue; // only matches with results
       const preds = [];
       for (const p of playerList) {
         const key = `${m.id}_${p.id}`;
         const data = predsByMatchPlayer[key];
         if (data && data.h!=="" && data.a!=="") {
-          preds.push({ name: p.name, h: data.h, a: data.a, pts: calcScore(data, cur[m.id]||{}) });
+          preds.push({ name: p.name, h: data.h, a: data.a, pts: calcScore(data, cur[m.id]||{}), playerId: p.id });
         }
       }
-      // Show match if: has a result entered OR has any predictions OR has offline players
-      const hasOfflinePlayers = playerList.some(p=>p.offline);
-      if (preds.length > 0 || (actual && actual.h!=="") || hasOfflinePlayers) {
-        result[m.id] = { match: m, actual: cur[m.id]||null, preds };
-      }
+      result[m.id] = { match: m, actual: cur[m.id], preds, playerList };
     }
     setAllPredictions(result);
     setLoadingPreds(false);
@@ -1515,8 +1537,9 @@ export default function App() {
                     {preds.map((p,i)=>{
                       const isWinner = p.pts===1;
                       const playerObj = players.find(pl=>pl.name===p.name);
-                      if (playerObj&&playerObj.offline) {
-                        return <OfflinePredictionInput key={i} player={playerObj} match={m} T={T} onSaved={loadAllPredictions} existing={{h:p.h,a:p.a}}/>;
+                      const isOffline = playerObj&&(playerObj.offline||!playerObj.email);
+                      if (isOffline) {
+                        return <OfflinePredictionInput key={i} player={playerObj} match={m} onSaved={loadAllPredictions} existing={{h:p.h,a:p.a}}/>;
                       }
                       return (
                         <div key={i} style={{
@@ -1532,16 +1555,17 @@ export default function App() {
                       );
                     })}
                     {/* Players who didn't predict — editable for offline players */}
-                    {players.filter(pl=>!preds.find(p=>p.name===pl.name)).map((pl,i)=>(
-                      pl.offline ? (
-                        <OfflinePredictionInput key={`np${i}`} player={pl} match={m} T={T} onSaved={loadAllPredictions}/>
+                    {players.filter(pl=>!preds.find(p=>p.name===pl.name)).map((pl,i)=>{
+                      const isOffline = pl.offline||!pl.email;
+                      return isOffline ? (
+                        <OfflinePredictionInput key={`np${i}`} player={pl} match={m} onSaved={loadAllPredictions}/>
                       ) : (
                         <div key={`np${i}`} style={{background:"#0a0a1a",border:`1px solid ${T.border}`,borderRadius:10,padding:"6px 12px",display:"flex",alignItems:"center",gap:6,opacity:0.5}}>
                           <span style={{color:T.muted,fontSize:13}}>{pl.name}</span>
                           <span style={{color:"#e74c3c",fontSize:10,fontWeight:700}}>NO PICK</span>
                         </div>
-                      )
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
