@@ -620,16 +620,18 @@ export default function App() {
 
   async function loadCuentas(weekIdx) {
     setLoadingCuentas(true);
-    const [allPredsSnap, aSnap, pSnap] = await Promise.all([
+    const [allPredsSnap, aSnap, pSnap, settledSnap] = await Promise.all([
       getDocs(collection(db,"match_predictions")),
       getDoc(doc(db,"actuals","results")),
       getDocs(collection(db,"players")),
+      getDoc(doc(db,"cuentas","settled")),
     ]);
     const cur = aSnap.exists()?aSnap.data():{};
     const playerList = [];
     pSnap.forEach(d=>playerList.push({id:d.id,...d.data()}));
     const predsByKey = {};
     allPredsSnap.forEach(d=>{ predsByKey[d.id]=d.data(); });
+    const settledIds = settledSnap.exists()?(settledSnap.data().ids||[]):[];
 
     const week = WEEKS[weekIdx];
     const weekMatches = ALL_MATCHES.filter(m=>week.dates.includes(m.date)&&cur[m.id]&&cur[m.id].h!==""&&cur[m.id].a!=="").slice().reverse();
@@ -644,15 +646,15 @@ export default function App() {
           if (calcScore(pred,actual)===1) winners.push(p);
         }
       }
-      return {match:m,actual,predictors,winners};
+      return {match:m,actual,predictors,winners,settled:settledIds.includes(m.id)};
     });
 
-    // Balance per player
+    // Balance per player — only count matches NOT yet settled
     const balance = {};
     playerList.forEach(p=>{ balance[p.id]={...p,earned:0,paid:0,net:0}; });
 
-    for (const {predictors,winners} of matchResults) {
-      if (winners.length===0) continue;
+    for (const {predictors,winners,settled} of matchResults) {
+      if (winners.length===0||settled) continue;
       const losers = predictors.filter(p=>!winners.find(w=>w.id===p.id));
       const prizePerWinner = losers.length/winners.length;
       for (const loser of losers) { balance[loser.id].paid+=1; balance[loser.id].net-=1; }
@@ -681,8 +683,17 @@ export default function App() {
       if (c.rem <= 0.001) ci++;
     }
 
-    setCuentasData({week,matchResults,balanceList,settlements});
+    setCuentasData({week,matchResults,balanceList,settlements,settledIds});
     setLoadingCuentas(false);
+  }
+
+  async function toggleSettleMatch(matchId, weekIdx) {
+    const settledRef = doc(db,"cuentas","settled");
+    const snap = await getDoc(settledRef);
+    const ids = snap.exists()?(snap.data().ids||[]):[];
+    const newIds = ids.includes(matchId) ? ids.filter(id=>id!==matchId) : [...ids, matchId];
+    await setDoc(settledRef, {ids:newIds});
+    await loadCuentas(weekIdx);
   }
 
   async function sendCuentasEmail(weekIdx) {
@@ -1616,11 +1627,12 @@ export default function App() {
             const {week,matchResults,balanceList,settlements}=cuentasData;
             const medals=["🥇","🥈","🥉"];
             const playedWithWinner=matchResults.filter(r=>r.winners.length>0);
-            const totalPot=playedWithWinner.reduce((sum,r)=>sum+r.predictors.length,0);
+            const pendingWithWinner=playedWithWinner.filter(r=>!r.settled);
+            const totalPot=pendingWithWinner.reduce((sum,r)=>sum+r.predictors.length,0);
             return(
               <>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
-                  {[["Partidos",matchResults.length,T.border,T.white],["Con ganador",playedWithWinner.length,T.gold+"44",T.gold],["Dinero en juego","$"+totalPot,"#2ecc7144","#2ecc71"]].map(([label,val,border,color])=>(
+                  {[["Partidos",matchResults.length,T.border,T.white],["Pendientes por saldar",pendingWithWinner.length,T.gold+"44",T.gold],["Dinero pendiente","$"+totalPot,"#2ecc7144","#2ecc71"]].map(([label,val,border,color])=>(
                     <div key={label} style={{background:T.bgCard,border:`1px solid ${border}`,borderRadius:12,padding:12,textAlign:"center"}}>
                       <div style={{color:T.muted,fontSize:11,marginBottom:4}}>{label}</div>
                       <div style={{color,fontWeight:900,fontSize:22}}>{val}</div>
@@ -1630,17 +1642,25 @@ export default function App() {
 
                 <div style={{color:T.white,fontWeight:800,fontSize:13,marginBottom:8}}>Partido por partido</div>
                 <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,overflow:"hidden",marginBottom:16}}>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr auto auto auto",gap:"4px 12px",padding:"8px 12px",background:"#002171"}}>
-                    {["Partido","Result.","Ganador MP","$"].map(h=><div key={h} style={{color:T.muted,fontSize:10,fontWeight:700,textTransform:"uppercase",textAlign:h==="Partido"?"left":"center"}}>{h}</div>)}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr auto auto auto auto",gap:"4px 10px",padding:"8px 12px",background:"#002171"}}>
+                    {["Partido","Result.","Ganador MP","$",""].map(h=><div key={h} style={{color:T.muted,fontSize:10,fontWeight:700,textTransform:"uppercase",textAlign:h==="Partido"?"left":"center"}}>{h}</div>)}
                   </div>
-                  {matchResults.map(({match:m,actual,predictors,winners},i)=>{
+                  {matchResults.map(({match:m,actual,predictors,winners,settled},i)=>{
                     const nw=winners.length===0;
                     return(
-                      <div key={m.id} style={{display:"grid",gridTemplateColumns:"1fr auto auto auto",gap:"4px 12px",padding:"8px 12px",borderTop:`1px solid ${T.border}22`,background:i%2===0?"transparent":"#ffffff05"}}>
-                        <div style={{color:T.white,fontSize:12}}>{FLAGS[m.home]||""} {m.home} vs {m.away} {FLAGS[m.away]||""}</div>
+                      <div key={m.id} style={{display:"grid",gridTemplateColumns:"1fr auto auto auto auto",gap:"4px 10px",padding:"8px 12px",borderTop:`1px solid ${T.border}22`,background:settled?"#0a2a0a33":i%2===0?"transparent":"#ffffff05",opacity:settled?0.6:1}}>
+                        <div style={{color:T.white,fontSize:12}}>{FLAGS[m.home]||""} {m.home} vs {m.away} {FLAGS[m.away]||""}{settled&&<span style={{color:"#2ecc71",fontSize:10,marginLeft:6}}>✓ saldado</span>}</div>
                         <div style={{color:T.gold,fontFamily:"monospace",fontWeight:900,textAlign:"center",fontSize:13}}>{actual.h}-{actual.a}</div>
                         <div style={{color:nw?T.muted:"#2ecc71",fontSize:12,textAlign:"center"}}>{nw?"—":winners.map(w=>w.name).join(", ")}</div>
                         <div style={{color:nw?T.muted:"#2ecc71",fontWeight:900,textAlign:"center",fontSize:13}}>{nw?"—":`$${predictors.length}`}</div>
+                        <div style={{textAlign:"center"}}>
+                          {!nw&&(
+                            <button onClick={()=>toggleSettleMatch(m.id,selectedWeek)}
+                              style={{background:settled?"#2ecc7122":"transparent",border:`1px solid ${settled?"#2ecc71":T.border}`,color:settled?"#2ecc71":T.muted,borderRadius:6,padding:"3px 8px",fontSize:10,fontWeight:700,cursor:"pointer"}}>
+                              {settled?"↺ Deshacer":"✓ Saldar"}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
