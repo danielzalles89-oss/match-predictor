@@ -877,7 +877,143 @@ export default function App() {
   }
 
   const [sendingLb, setSendingLb] = useState(false);
+  const [sendingDaily, setSendingDaily] = useState(false);
+  const [sendDailyMsg, setSendDailyMsg] = useState("");
   const [sendLbMsg, setSendLbMsg] = useState("");
+
+  async function sendDailySummaryEmail() {
+    setSendingDaily(true);
+    setSendDailyMsg("");
+    try {
+      await loadEmailJS();
+
+      const [allPredsSnap, aSnap, pSnap, excelSnap] = await Promise.all([
+        getDocs(collection(db,"match_predictions")),
+        getDoc(doc(db,"actuals","results")),
+        getDocs(collection(db,"players")),
+        getDocs(collection(db,"excel_quiniela")),
+      ]);
+      const cur = aSnap.exists()?aSnap.data():{};
+      const playerList = [];
+      pSnap.forEach(d=>playerList.push({id:d.id,...d.data()}));
+      const predsByKey = {};
+      allPredsSnap.forEach(d=>{ predsByKey[d.id]=d.data(); });
+
+      function calcQuinielaScore(pred, actual) {
+        if (!actual||actual.h===""||actual.a==="") return 0;
+        if (!pred||pred.h===""||pred.a==="") return 0;
+        const ph=Number(pred.h),pa=Number(pred.a),ah=Number(actual.h),aa=Number(actual.a);
+        if (isNaN(ph)||isNaN(pa)||isNaN(ah)||isNaN(aa)) return 0;
+        let pts=0;
+        const pw=ph>pa?"h":ph<pa?"a":"d", aw=ah>aa?"h":ah<aa?"a":"d";
+        if (pw===aw) pts+=10;
+        if (ph===ah) pts+=3;
+        if (pa===aa) pts+=3;
+        if ((ph-pa)===(ah-aa)) pts+=4;
+        return pts;
+      }
+
+      // Today's date in our format (e.g. "Jun 17")
+      const today = new Date();
+      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const todayStr = `${months[today.getMonth()]} ${today.getDate()}`;
+
+      // Matches played today (with a result entered)
+      const todaysMatches = ALL_MATCHES.filter(m=>m.date===todayStr && cur[m.id] && cur[m.id].h!=="" && cur[m.id].a!=="");
+
+      if (todaysMatches.length===0) {
+        setSendDailyMsg("No hay partidos con resultado hoy ("+todayStr+")");
+        setSendingDaily(false);
+        setTimeout(()=>setSendDailyMsg(""),4000);
+        return;
+      }
+
+      // Build match result blocks
+      const matchBlocks = todaysMatches.map(m=>{
+        const actual = cur[m.id];
+        const winners = playerList.filter(p=>{
+          const pred = predsByKey[`${m.id}_${p.id}`];
+          return pred && calcScore(pred,actual)===1;
+        });
+        const winnerHtml = winners.length>0
+          ? `<div style="background:#1a1a00;border-radius:8px;padding:8px 12px;margin-top:8px"><span style="color:#f5c842;font-size:12px;font-weight:700">🎯 Ganador${winners.length>1?'es':''}: ${winners.map(w=>w.name).join(', ')}</span></div>`
+          : `<div style="background:#1a0a0a;border-radius:8px;padding:8px 12px;margin-top:8px"><span style="color:#e74c3c;font-size:12px">Sin ganador esta vez</span></div>`;
+        return `<div style="background:#0a1f6e;border-radius:10px;padding:14px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:14px;font-weight:700;color:#f0f8ff">${FLAGS[m.home]||""} ${m.home} vs ${m.away} ${FLAGS[m.away]||""}</span>
+            <span style="color:#f5c842;font-weight:900;font-size:16px;font-family:monospace">${actual.h}-${actual.a}</span>
+          </div>
+          ${winnerHtml}
+        </div>`;
+      }).join('');
+
+      // Excel Quiniela standings
+      const excelPlayers = {};
+      excelSnap.forEach(d=>{
+        const data = d.data();
+        if(!excelPlayers[data.email]) excelPlayers[data.email]=[];
+        excelPlayers[data.email].push({name:data.name, preds:data.predictions||{}});
+      });
+      const excelStandings = [];
+      for (const entries of Object.values(excelPlayers)) {
+        for (const entry of entries) {
+          let total=0;
+          for (const m of ALL_MATCHES) {
+            const pred=entry.preds[m.id];
+            if(pred) total+=calcQuinielaScore({h:String(pred.h||""),a:String(pred.a||"")}, cur[m.id]||{});
+          }
+          excelStandings.push({name:entry.name, total});
+        }
+      }
+      excelStandings.sort((a,b)=>b.total-a.total);
+      const medals=["🥇","🥈","🥉"];
+      const excelRows = excelStandings.map((p,i)=>
+        `<tr style="border-bottom:1px solid #1a3080">
+          <td style="padding:8px 12px;color:#f0f8ff;font-weight:700;font-size:13px">${medals[i]||`#${i+1}`} ${p.name}</td>
+          <td style="padding:8px 12px;text-align:center;color:#f5c842;font-weight:900">${p.total}</td>
+        </tr>`
+      ).join('');
+
+      const htmlBody = `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#001254;color:#f0f8ff;padding:24px;border-radius:12px">
+        <h2 style="color:#20B2AA;margin:0 0 4px">⚽ Resumen del día — ${todayStr}</h2>
+        <p style="color:#83BAB5;margin:0 0 20px;font-size:13px">${todaysMatches.length} partido${todaysMatches.length!==1?'s':''} jugado${todaysMatches.length!==1?'s':''} hoy</p>
+
+        <h3 style="color:#83BAB5;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin:0 0 10px">Resultados de hoy</h3>
+        ${matchBlocks}
+
+        <h3 style="color:#f5c842;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin:20px 0 10px">Quiniela Excel — Standings actualizados</h3>
+        <table style="width:100%;border-collapse:collapse;background:#0a1f6e;border-radius:10px;overflow:hidden">
+          <thead><tr style="background:#002171">
+            <th style="padding:8px 12px;text-align:left;color:#83BAB5;font-size:10px;text-transform:uppercase">Jugador</th>
+            <th style="padding:8px 12px;text-align:center;color:#83BAB5;font-size:10px;text-transform:uppercase">Puntos</th>
+          </tr></thead>
+          <tbody>${excelRows}</tbody>
+        </table>
+
+        <p style="color:#4a7a8a;font-size:11px;margin-top:16px">Zalles WC 2026 · Resumen diario</p>
+      </div>`;
+
+      let sent=0, failed=0;
+      for (const player of players) {
+        try {
+          await window.emailjs.send("dzalles@iterla.com","template_33yasn5",{
+            to_email: player.email,
+            email: player.email,
+            subject: `⚽ Resumen del día ${todayStr} — WC 2026`,
+            message: htmlBody,
+          });
+          sent++;
+          await new Promise(r=>setTimeout(r,500));
+        } catch(e){ failed++; }
+      }
+      setSendDailyMsg(`✓ Resumen enviado a ${sent} jugadores`);
+    } catch(e) {
+      setSendDailyMsg("Error enviando resumen");
+      console.error(e);
+    }
+    setTimeout(()=>setSendDailyMsg(""),5000);
+    setSendingDaily(false);
+  }
 
   async function sendLeaderboardEmail() {
     setSendingLb(true);
@@ -1209,10 +1345,16 @@ export default function App() {
                 {saveMsg&&<span style={{color:T.green,fontWeight:800}}>{saveMsg}</span>}
               </div>
               <button onClick={sendLeaderboardEmail} disabled={sendingLb}
-                style={{width:"100%",padding:14,fontSize:15,fontWeight:900,background:`linear-gradient(135deg,${T.teal},#178a84)`,color:"#fff",border:"none",borderRadius:12,cursor:"pointer",opacity:sendingLb?0.6:1}}>
+                style={{width:"100%",padding:14,fontSize:15,fontWeight:900,background:`linear-gradient(135deg,${T.teal},#178a84)`,color:"#fff",border:"none",borderRadius:12,cursor:"pointer",opacity:sendingLb?0.6:1,marginBottom:8}}>
                 {sendingLb?`Sending standings...`:`📊 Send Quiniela Standings to ${players.length} players`}
               </button>
-              {sendLbMsg&&<div style={{color:T.green,fontWeight:800,textAlign:"center",marginTop:8}}>{sendLbMsg}</div>}
+              {sendLbMsg&&<div style={{color:T.green,fontWeight:800,textAlign:"center",marginBottom:8}}>{sendLbMsg}</div>}
+
+              <button onClick={sendDailySummaryEmail} disabled={sendingDaily}
+                style={{width:"100%",padding:14,fontSize:15,fontWeight:900,background:`linear-gradient(135deg,#7b5fd6,#5a44a8)`,color:"#fff",border:"none",borderRadius:12,cursor:"pointer",opacity:sendingDaily?0.6:1}}>
+                {sendingDaily?"Enviando resumen...":`📨 Enviar resumen de hoy a ${players.length} jugadores`}
+              </button>
+              {sendDailyMsg&&<div style={{color:T.green,fontWeight:800,textAlign:"center",marginTop:8}}>{sendDailyMsg}</div>}
             </div>
           )}
 
