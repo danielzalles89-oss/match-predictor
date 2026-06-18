@@ -770,7 +770,7 @@ export default function App() {
       </div>`;
 
       let sent=0,failed=0;
-      for (const player of players) {
+      for (const player of players.filter(p=>!p.offline)) {
         try {
           await window.emailjs.send("dzalles@iterla.com","template_33yasn5",{
             to_email:player.email,email:player.email,
@@ -787,9 +787,16 @@ export default function App() {
   }
 
   async function addPlayer() {
-    if (!newName.trim()||!newEmail.trim()) return;
-    const id = newEmail.toLowerCase().replace(/[^a-z0-9]/g,"_");
-    await setDoc(doc(db,"players",id),{name:newName.trim(),email:newEmail.trim()});
+    if (!newName.trim()) return;
+    const hasEmail = newEmail.trim().length>0;
+    const id = hasEmail
+      ? newEmail.toLowerCase().replace(/[^a-z0-9]/g,"_")
+      : "offline_"+newName.toLowerCase().replace(/[^a-z0-9]/g,"_")+"_"+Date.now();
+    await setDoc(doc(db,"players",id),{
+      name:newName.trim(),
+      email: hasEmail ? newEmail.trim() : "",
+      offline: !hasEmail,
+    });
     setNewName(""); setNewEmail("");
     await loadPlayers();
   }
@@ -838,7 +845,7 @@ export default function App() {
       await loadEmailJS();
       const matches = ALL_MATCHES.filter(m=>selectedMatches.includes(m.id));
       let sent=0, failed=0;
-      for (const player of players) {
+      for (const player of players.filter(p=>!p.offline)) {
         // Group matches by date
         const byDate = {};
         matches.forEach(m=>{ if(!byDate[m.date])byDate[m.date]=[]; byDate[m.date].push(m); });
@@ -1005,7 +1012,7 @@ export default function App() {
       </div>`;
 
       let sent=0, failed=0;
-      for (const player of players) {
+      for (const player of players.filter(p=>!p.offline)) {
         try {
           await window.emailjs.send("dzalles@iterla.com","template_33yasn5",{
             to_email: player.email,
@@ -1127,7 +1134,7 @@ export default function App() {
       </div>`;
 
       let sent=0, failed=0;
-      for (const player of players) {
+      for (const player of players.filter(p=>!p.offline)) {
         try {
           await window.emailjs.send("dzalles@iterla.com","template_33yasn5",{
             to_email: player.email,
@@ -1227,7 +1234,7 @@ export default function App() {
         <div style={{maxWidth:660,margin:"0 auto",padding:16}}>
           <div style={{background:T.bgCard,border:`1px solid ${T.teal}`,borderRadius:12,padding:"14px 16px",marginBottom:16}}>
             <div style={{color:T.teal,fontWeight:800,fontSize:15,marginBottom:4}}>📧 Send Prediction Emails via Outlook</div>
-            <div style={{color:T.muted,fontSize:13}}>Select matches → send personal prediction links to all {players.length} player{players.length!==1?"s":""}.</div>
+            <div style={{color:T.muted,fontSize:13}}>Select matches → send personal prediction links to all {players.filter(p=>!p.offline).length} player{players.filter(p=>!p.offline).length!==1?"s":""}.</div>
           </div>
 
           {upcomingMatches.length===0?(
@@ -1301,7 +1308,7 @@ export default function App() {
           <div style={{marginTop:20,display:"flex",alignItems:"center",gap:12}}>
             <button onClick={sendEmails} disabled={sending||selectedMatches.length===0||players.length===0}
               style={{flex:1,padding:14,fontSize:15,fontWeight:900,background:selectedMatches.length===0||players.length===0?T.bgCard:`linear-gradient(135deg,${T.teal},#178a84)`,color:selectedMatches.length===0||players.length===0?T.muted:"#fff",border:"none",borderRadius:12,cursor:selectedMatches.length===0||players.length===0?"not-allowed":"pointer",opacity:sending?0.6:1}}>
-              {sending?`Sending to ${players.length} players...`:`📧 Send to ${players.length} players (${selectedMatches.length} match${selectedMatches.length!==1?"es":""})`}
+              {sending?`Sending to ${players.filter(p=>!p.offline).length} players...`:`📧 Send to ${players.filter(p=>!p.offline).length} players (${selectedMatches.length} match${selectedMatches.length!==1?"es":""})`}
             </button>
           </div>
           {sendMsg&&<div style={{color:T.green,fontWeight:800,textAlign:"center",marginTop:12,fontSize:14}}>{sendMsg}</div>}
@@ -1316,23 +1323,27 @@ export default function App() {
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <input placeholder="Name" value={newName} onChange={e=>setNewName(e.target.value)}
                 style={{flex:1,minWidth:100,padding:"10px 12px",fontSize:14,background:T.bgDeep,border:`1px solid ${T.border}`,borderRadius:8,color:T.white,outline:"none"}}/>
-              <input placeholder="Email" value={newEmail} onChange={e=>setNewEmail(e.target.value)}
+              <input placeholder="Email (deja vacío si no tiene)" value={newEmail} onChange={e=>setNewEmail(e.target.value)}
                 onKeyDown={e=>e.key==="Enter"&&addPlayer()}
                 style={{flex:2,minWidth:160,padding:"10px 12px",fontSize:14,background:T.bgDeep,border:`1px solid ${T.border}`,borderRadius:8,color:T.white,outline:"none"}}/>
               <button onClick={addPlayer} style={{padding:"10px 20px",background:`linear-gradient(135deg,${T.teal},#178a84)`,border:"none",borderRadius:8,color:"#fff",fontWeight:800,cursor:"pointer",fontSize:14}}>Add</button>
             </div>
+            <div style={{color:T.muted,fontSize:11,marginTop:8}}>Sin email = jugador "offline" (ej. sin computadora). No recibe correos; tú entras sus predicciones manualmente.</div>
           </div>
           {players.length===0?(
             <div style={{textAlign:"center",color:T.muted,padding:40}}>No players yet. Add someone above!</div>
           ):players.map(p=>(
-            <div key={p.id} style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:"12px 16px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div key={p.id} style={{background:T.bgCard,border:`1px solid ${p.offline?T.gold+"44":T.border}`,borderRadius:10,padding:"12px 16px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 <div style={{width:36,height:36,background:`linear-gradient(135deg,${T.navy},${T.blue})`,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:14,color:T.teal,flexShrink:0}}>
                   {p.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div style={{color:T.white,fontWeight:700,fontSize:14}}>{p.name}</div>
-                  <div style={{color:T.muted,fontSize:12}}>{p.email}</div>
+                  <div style={{color:T.white,fontWeight:700,fontSize:14,display:"flex",alignItems:"center",gap:6}}>
+                    {p.name}
+                    {p.offline&&<span style={{background:T.gold+"22",color:T.gold,fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10}}>📵 OFFLINE</span>}
+                  </div>
+                  <div style={{color:T.muted,fontSize:12}}>{p.offline?"Sin email · entrada manual":p.email}</div>
                 </div>
               </div>
               <button onClick={()=>removePlayer(p.id)} style={{background:"none",border:"1px solid rgba(231,76,60,0.3)",color:T.red,borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:12}}>Remove</button>
@@ -1357,13 +1368,13 @@ export default function App() {
               </div>
               <button onClick={sendLeaderboardEmail} disabled={sendingLb}
                 style={{width:"100%",padding:14,fontSize:15,fontWeight:900,background:`linear-gradient(135deg,${T.teal},#178a84)`,color:"#fff",border:"none",borderRadius:12,cursor:"pointer",opacity:sendingLb?0.6:1,marginBottom:8}}>
-                {sendingLb?`Sending standings...`:`📊 Send Quiniela Standings to ${players.length} players`}
+                {sendingLb?`Sending standings...`:`📊 Send Quiniela Standings to ${players.filter(p=>!p.offline).length} players`}
               </button>
               {sendLbMsg&&<div style={{color:T.green,fontWeight:800,textAlign:"center",marginBottom:8}}>{sendLbMsg}</div>}
 
               <button onClick={sendDailySummaryEmail} disabled={sendingDaily}
                 style={{width:"100%",padding:14,fontSize:15,fontWeight:900,background:`linear-gradient(135deg,#7b5fd6,#5a44a8)`,color:"#fff",border:"none",borderRadius:12,cursor:"pointer",opacity:sendingDaily?0.6:1}}>
-                {sendingDaily?"Enviando resumen...":`📨 Enviar resumen de hoy a ${players.length} jugadores`}
+                {sendingDaily?"Enviando resumen...":`📨 Enviar resumen de hoy a ${players.filter(p=>!p.offline).length} jugadores`}
               </button>
               {sendDailyMsg&&<div style={{color:T.green,fontWeight:800,textAlign:"center",marginTop:8}}>{sendDailyMsg}</div>}
             </div>
@@ -1708,7 +1719,7 @@ export default function App() {
                   style={{width:"100%",padding:14,fontSize:14,fontWeight:900,
                     background:`linear-gradient(135deg,${T.gold},#c9a030)`,
                     color:T.bgDeep,border:"none",borderRadius:12,cursor:"pointer",opacity:sendingCuentas?0.6:1}}>
-                  {sendingCuentas?"Enviando...":`💰 Enviar resumen ${week.label} a ${players.length} jugadores`}
+                  {sendingCuentas?"Enviando...":`💰 Enviar resumen ${week.label} a ${players.filter(p=>!p.offline).length} jugadores`}
                 </button>
                 {sendCuentasMsg&&<div style={{color:T.green,fontWeight:800,textAlign:"center",marginTop:8}}>{sendCuentasMsg}</div>}
               </>
