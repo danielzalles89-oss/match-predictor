@@ -581,11 +581,10 @@ export default function App() {
       predsByMatchPlayer[d.id] = d.data();
     });
 
-    // Build result grouped by match — only show matches with results entered
+    // Build result — show matches with results OR any predictions
     const result = {};
     for (const m of ALL_MATCHES.slice().reverse()) {
       const actual = cur[m.id];
-      if (!actual || actual.h==="" || actual.a==="") continue; // only matches with results
       const preds = [];
       for (const p of playerList) {
         const key = `${m.id}_${p.id}`;
@@ -594,7 +593,10 @@ export default function App() {
           preds.push({ name: p.name, h: data.h, a: data.a, pts: calcScore(data, cur[m.id]||{}), playerId: p.id });
         }
       }
-      result[m.id] = { match: m, actual: cur[m.id], preds, playerList };
+      const hasResult = actual && actual.h!=="" && actual.a!=="";
+      if (preds.length > 0 || hasResult) {
+        result[m.id] = { match: m, actual: cur[m.id]||null, preds, playerList };
+      }
     }
     setAllPredictions(result);
     setLoadingPreds(false);
@@ -1471,10 +1473,11 @@ export default function App() {
             <div style={{textAlign:"center",color:T.muted,padding:40}}>Loading...</div>
           ):Object.keys(allPredictions).length===0?(
             <div style={{textAlign:"center",color:T.muted,padding:40}}>No predictions yet.</div>
-          ):Object.values(allPredictions).map(({match:m, actual, preds})=>{
+          ):Object.values(allPredictions).map(({match:m, actual, preds, playerList:matchPlayers})=>{
             const hasResult = actual&&actual.h!==""&&actual.a!=="";
             const winners = preds.filter(p=>p.pts===1);
             const participated = preds.length;
+            const allPlayers = matchPlayers||players;
             return (
               <div key={m.id} style={{
                 background:T.bgCard,
@@ -1536,7 +1539,7 @@ export default function App() {
                   <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                     {preds.map((p,i)=>{
                       const isWinner = p.pts===1;
-                      const playerObj = players.find(pl=>pl.name===p.name);
+                      const playerObj = allPlayers.find(pl=>pl.name===p.name);
                       const isOffline = playerObj&&(playerObj.offline||!playerObj.email);
                       if (isOffline) {
                         return <OfflinePredictionInput key={i} player={playerObj} match={m} onSaved={loadAllPredictions} existing={{h:p.h,a:p.a}}/>;
@@ -1555,7 +1558,7 @@ export default function App() {
                       );
                     })}
                     {/* Players who didn't predict — editable for offline players */}
-                    {players.filter(pl=>!preds.find(p=>p.name===pl.name)).map((pl,i)=>{
+                    {allPlayers.filter(pl=>!preds.find(p=>p.name===pl.name)).map((pl,i)=>{
                       const isOffline = pl.offline||!pl.email;
                       return isOffline ? (
                         <OfflinePredictionInput key={`np${i}`} player={pl} match={m} onSaved={loadAllPredictions}/>
