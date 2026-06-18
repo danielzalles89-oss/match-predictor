@@ -555,9 +555,11 @@ export default function App() {
       predsByMatchPlayer[d.id] = d.data();
     });
 
-    // Build result grouped by match — iterate in reverse so most recent matches appear first
+    // Build result grouped by match — show ALL locked matches so offline players can be entered
     const result = {};
     for (const m of ALL_MATCHES.slice().reverse()) {
+      const actual = cur[m.id];
+      if (!actual && !isLocked(m)) continue; // skip future matches with no result
       const preds = [];
       for (const p of playerList) {
         const key = `${m.id}_${p.id}`;
@@ -566,7 +568,9 @@ export default function App() {
           preds.push({ name: p.name, h: data.h, a: data.a, pts: calcScore(data, cur[m.id]||{}) });
         }
       }
-      if (preds.length > 0) {
+      // Show match if: has a result entered OR has any predictions OR has offline players
+      const hasOfflinePlayers = playerList.some(p=>p.offline);
+      if (preds.length > 0 || (actual && actual.h!=="") || hasOfflinePlayers) {
         result[m.id] = { match: m, actual: cur[m.id]||null, preds };
       }
     }
