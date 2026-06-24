@@ -78,26 +78,26 @@ const ALL_MATCHES = [
   { id:"G50", date:"Jun 24", time:"2:00 PM",  kickoff:"2026-06-24T19:00:00Z", home:"Bosnia & Herz.",away:"Qatar",          group:"B" },
   { id:"G51", date:"Jun 24", time:"5:00 PM",  kickoff:"2026-06-24T22:00:00Z", home:"Scotland",      away:"Brazil",         group:"C" },
   { id:"G52", date:"Jun 24", time:"5:00 PM",  kickoff:"2026-06-24T22:00:00Z", home:"Morocco",       away:"Haiti",          group:"C" },
-  { id:"G53", date:"Jun 25", time:"2:00 PM",  kickoff:"2026-06-25T19:00:00Z", home:"South Korea",   away:"South Africa",   group:"A" },
-  { id:"G54", date:"Jun 25", time:"2:00 PM",  kickoff:"2026-06-25T19:00:00Z", home:"Mexico",        away:"Czechia",        group:"A" },
-  { id:"G55", date:"Jun 25", time:"5:00 PM",  kickoff:"2026-06-25T22:00:00Z", home:"Turkey",        away:"USA",            group:"D" },
-  { id:"G56", date:"Jun 25", time:"5:00 PM",  kickoff:"2026-06-25T22:00:00Z", home:"Paraguay",      away:"Australia",      group:"D" },
-  { id:"G57", date:"Jun 26", time:"2:00 PM",  kickoff:"2026-06-26T19:00:00Z", home:"Curaçao",       away:"Germany",        group:"E" },
-  { id:"G58", date:"Jun 26", time:"2:00 PM",  kickoff:"2026-06-26T19:00:00Z", home:"Ecuador",       away:"Ivory Coast",    group:"E" },
-  { id:"G59", date:"Jun 26", time:"5:00 PM",  kickoff:"2026-06-26T22:00:00Z", home:"Tunisia",       away:"Netherlands",    group:"F" },
-  { id:"G60", date:"Jun 26", time:"5:00 PM",  kickoff:"2026-06-26T22:00:00Z", home:"Sweden",        away:"Japan",          group:"F" },
-  { id:"G61", date:"Jun 27", time:"2:00 PM",  kickoff:"2026-06-27T19:00:00Z", home:"Norway",        away:"France",         group:"I" },
-  { id:"G62", date:"Jun 27", time:"2:00 PM",  kickoff:"2026-06-27T19:00:00Z", home:"Senegal",       away:"Iraq",           group:"I" },
-  { id:"G63", date:"Jun 27", time:"5:00 PM",  kickoff:"2026-06-27T22:00:00Z", home:"Cape Verde",    away:"Saudi Arabia",   group:"H" },
-  { id:"G64", date:"Jun 27", time:"5:00 PM",  kickoff:"2026-06-27T22:00:00Z", home:"Uruguay",       away:"Spain",          group:"H" },
-  { id:"G65", date:"Jun 27", time:"8:00 PM",  kickoff:"2026-06-28T01:00:00Z", home:"Egypt",         away:"Iran",           group:"G" },
-  { id:"G66", date:"Jun 27", time:"8:00 PM",  kickoff:"2026-06-28T01:00:00Z", home:"New Zealand",   away:"Belgium",        group:"G" },
-  { id:"G67", date:"Jun 27", time:"9:00 PM",  kickoff:"2026-06-28T02:00:00Z", home:"Panama",        away:"England",        group:"L" },
-  { id:"G68", date:"Jun 27", time:"9:00 PM",  kickoff:"2026-06-28T02:00:00Z", home:"Croatia",       away:"Ghana",          group:"L" },
-  { id:"G69", date:"Jun 28", time:"11:30 PM", kickoff:"2026-06-28T04:30:00Z", home:"Colombia",      away:"Portugal",       group:"K" },
-  { id:"G70", date:"Jun 28", time:"11:30 PM", kickoff:"2026-06-28T04:30:00Z", home:"DR Congo",      away:"Uzbekistan",     group:"K" },
-  { id:"G71", date:"Jun 28", time:"2:00 AM",  kickoff:"2026-06-28T07:00:00Z", home:"Algeria",       away:"Austria",        group:"J" },
-  { id:"G72", date:"Jun 28", time:"2:00 AM",  kickoff:"2026-06-28T07:00:00Z", home:"Jordan",        away:"Argentina",      group:"J" },
+  { id:"G53", date:"Jun 24", time:"8:00 PM",  kickoff:"2026-06-25T01:00:00Z", home:"South Africa",  away:"South Korea",    group:"A" },
+  { id:"G54", date:"Jun 24", time:"8:00 PM",  kickoff:"2026-06-25T01:00:00Z", home:"Czechia",       away:"Mexico",         group:"A" },
+  { id:"G55", date:"Jun 25", time:"3:00 PM",  kickoff:"2026-06-25T20:00:00Z", home:"Ecuador",       away:"Germany",        group:"E" },
+  { id:"G56", date:"Jun 25", time:"3:00 PM",  kickoff:"2026-06-25T20:00:00Z", home:"Curaçao",       away:"Ivory Coast",    group:"E" },
+  { id:"G57", date:"Jun 25", time:"6:00 PM",  kickoff:"2026-06-25T23:00:00Z", home:"Japan",         away:"Sweden",         group:"F" },
+  { id:"G58", date:"Jun 25", time:"6:00 PM",  kickoff:"2026-06-25T23:00:00Z", home:"Tunisia",       away:"Netherlands",    group:"F" },
+  { id:"G59", date:"Jun 25", time:"9:00 PM",  kickoff:"2026-06-26T02:00:00Z", home:"Turkey",        away:"USA",            group:"D" },
+  { id:"G60", date:"Jun 25", time:"9:00 PM",  kickoff:"2026-06-26T02:00:00Z", home:"Paraguay",      away:"Australia",      group:"D" },
+  { id:"G61", date:"Jun 26", time:"2:00 PM",  kickoff:"2026-06-26T19:00:00Z", home:"Norway",        away:"France",         group:"I" },
+  { id:"G62", date:"Jun 26", time:"2:00 PM",  kickoff:"2026-06-26T19:00:00Z", home:"Senegal",       away:"Iraq",           group:"I" },
+  { id:"G63", date:"Jun 26", time:"7:00 PM",  kickoff:"2026-06-27T00:00:00Z", home:"Cape Verde",    away:"Saudi Arabia",   group:"H" },
+  { id:"G64", date:"Jun 26", time:"7:00 PM",  kickoff:"2026-06-27T00:00:00Z", home:"Uruguay",       away:"Spain",          group:"H" },
+  { id:"G65", date:"Jun 26", time:"10:00 PM", kickoff:"2026-06-27T03:00:00Z", home:"Egypt",         away:"Iran",           group:"G" },
+  { id:"G66", date:"Jun 26", time:"10:00 PM", kickoff:"2026-06-27T03:00:00Z", home:"New Zealand",   away:"Belgium",        group:"G" },
+  { id:"G67", date:"Jun 27", time:"4:00 PM",  kickoff:"2026-06-27T21:00:00Z", home:"Panama",        away:"England",        group:"L" },
+  { id:"G68", date:"Jun 27", time:"4:00 PM",  kickoff:"2026-06-27T21:00:00Z", home:"Croatia",       away:"Ghana",          group:"L" },
+  { id:"G69", date:"Jun 27", time:"6:30 PM",  kickoff:"2026-06-27T23:30:00Z", home:"Colombia",      away:"Portugal",       group:"K" },
+  { id:"G70", date:"Jun 27", time:"6:30 PM",  kickoff:"2026-06-27T23:30:00Z", home:"DR Congo",      away:"Uzbekistan",     group:"K" },
+  { id:"G71", date:"Jun 27", time:"9:00 PM",  kickoff:"2026-06-28T02:00:00Z", home:"Algeria",       away:"Austria",        group:"J" },
+  { id:"G72", date:"Jun 27", time:"9:00 PM",  kickoff:"2026-06-28T02:00:00Z", home:"Jordan",        away:"Argentina",      group:"J" },
 ];
 
 const FLAGS = {
@@ -120,7 +120,9 @@ function calcScore(pred, actual) {
   if (!pred||pred.h==null||pred.a==null||pred.h===""||pred.a==="") return 0;
   const ph=Number(pred.h),pa=Number(pred.a),ah=Number(actual.h),aa=Number(actual.a);
   if (isNaN(ph)||isNaN(pa)||isNaN(ah)||isNaN(aa)) return 0;
-  return (ph===ah&&pa===aa) ? 1 : 0;
+  if (ph===ah&&pa===aa) return 3;
+  const pw=ph>pa?"h":ph<pa?"a":"d", aw=ah>aa?"h":ah<aa?"a":"d";
+  return pw===aw ? 1 : 0;
 }
 
 function isLocked(match) { return new Date() >= new Date(match.kickoff); }
@@ -221,7 +223,7 @@ function DailyPredictPage({date, userId, userName}) {
     async function load() {
       // Load existing predictions for all today's matches
       const predPromises = allMatches.map(m=>getDoc(doc(db,"match_predictions",`${m.id}_${userId}`)));
-      const aSnap = await getDoc(doc(db,"actuals","results"));
+      const aSnap = await getDoc(doc(db,"actuals","results_mp"));
       const cur = aSnap.exists()?aSnap.data():{};
       setActuals(cur);
       const pSnaps = await Promise.all(predPromises);
@@ -374,7 +376,7 @@ function PredictPage({matchId, userId, userName}) {
     async function load() {
       const pSnap = await getDoc(doc(db,"match_predictions",`${matchId}_${userId}`));
       if (pSnap.exists()) { setPred(pSnap.data()); setSubmitted(true); }
-      const aSnap = await getDoc(doc(db,"actuals","results"));
+      const aSnap = await getDoc(doc(db,"actuals","results_mp"));
       if (aSnap.exists()&&aSnap.data()[matchId]) setActual(aSnap.data()[matchId]);
       setLoading(false);
     }
@@ -518,14 +520,14 @@ export default function App() {
   }
 
   async function loadActuals() {
-    const snap = await getDoc(doc(db,"actuals","results"));
+    const snap = await getDoc(doc(db,"actuals","results_mp"));
     if (snap.exists()) setActuals(snap.data());
   }
 
   async function loadExcelLeaderboard() {
     setLoadingExcelLb(true);
     const [aSnap, excelSnap] = await Promise.all([
-      getDoc(doc(db,"actuals","results")),
+      getDoc(doc(db,"actuals","results_mp")),
       getDocs(collection(db,"excel_quiniela")),
     ]);
     const cur = aSnap.exists()?aSnap.data():{};
@@ -565,7 +567,7 @@ export default function App() {
     // Load players + actuals in parallel
     const [pSnap, aSnap] = await Promise.all([
       getDocs(collection(db,"players")),
-      getDoc(doc(db,"actuals","results")),
+      getDoc(doc(db,"actuals","results_mp")),
     ]);
     const playerList = [];
     pSnap.forEach(d=>playerList.push({id:d.id,...d.data()}));
@@ -605,7 +607,7 @@ export default function App() {
   async function loadLeaderboard() {
     setLoadingLb(true);
     const [aSnap, pSnap, allPredsSnap] = await Promise.all([
-      getDoc(doc(db,"actuals","results")),
+      getDoc(doc(db,"actuals","results_mp")),
       getDocs(collection(db,"players")),
       getDocs(collection(db,"match_predictions")),
     ]);
@@ -631,7 +633,7 @@ export default function App() {
   async function loadExcelLeaderboard() {
     setLoadingExcelLb(true);
     const [aSnap, excelSnap] = await Promise.all([
-      getDoc(doc(db,"actuals","results")),
+      getDoc(doc(db,"actuals","results_mp")),
       getDocs(collection(db,"excel_quiniela")),
     ]);
     const cur = aSnap.exists()?aSnap.data():{};
@@ -686,7 +688,7 @@ export default function App() {
     setLoadingCuentas(true);
     const [allPredsSnap, aSnap, pSnap, settledSnap] = await Promise.all([
       getDocs(collection(db,"match_predictions")),
-      getDoc(doc(db,"actuals","results")),
+      getDoc(doc(db,"actuals","results_mp")),
       getDocs(collection(db,"players")),
       getDoc(doc(db,"cuentas","settled")),
     ]);
@@ -872,7 +874,7 @@ export default function App() {
 
   async function saveActuals() {
     setSaving(true);
-    await setDoc(doc(db,"actuals","results"),actuals);
+    await setDoc(doc(db,"actuals","results_mp"),actuals);
     setSaveMsg("✓ Results saved!");
     setTimeout(()=>setSaveMsg(""),2500);
     setSaving(false);
@@ -971,7 +973,7 @@ export default function App() {
 
       const [allPredsSnap, aSnap, pSnap, excelSnap] = await Promise.all([
         getDocs(collection(db,"match_predictions")),
-        getDoc(doc(db,"actuals","results")),
+        getDoc(doc(db,"actuals","results_mp")),
         getDocs(collection(db,"players")),
         getDocs(collection(db,"excel_quiniela")),
       ]);
@@ -1106,7 +1108,7 @@ export default function App() {
       // ── Load all data in parallel ──
       const [allPredsSnap, aSnap, pSnap, excelSnap] = await Promise.all([
         getDocs(collection(db,"match_predictions")),
-        getDoc(doc(db,"actuals","results")),
+        getDoc(doc(db,"actuals","results_mp")),
         getDocs(collection(db,"players")),
         getDocs(collection(db,"excel_quiniela")),
       ]);
