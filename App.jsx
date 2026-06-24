@@ -120,9 +120,14 @@ function calcScore(pred, actual) {
   if (!pred||pred.h==null||pred.a==null||pred.h===""||pred.a==="") return 0;
   const ph=Number(pred.h),pa=Number(pred.a),ah=Number(actual.h),aa=Number(actual.a);
   if (isNaN(ph)||isNaN(pa)||isNaN(ah)||isNaN(aa)) return 0;
-  if (ph===ah&&pa===aa) return 3;
   const pw=ph>pa?"h":ph<pa?"a":"d", aw=ah>aa?"h":ah<aa?"a":"d";
-  return pw===aw ? 1 : 0;
+  if (pw!==aw) return 0; // wrong result = 0
+  let pts = 10; // correct result
+  if (ph===ah&&pa===aa) pts += 10; // exact score bonus
+  if (ph===ah) pts += 3; // home goals correct
+  if (pa===aa) pts += 3; // away goals correct
+  if (Math.abs(ph-pa)===Math.abs(ah-aa)) pts += 4; // goal difference correct
+  return pts;
 }
 
 function isLocked(match) { return new Date() >= new Date(match.kickoff); }
@@ -542,7 +547,7 @@ export default function App() {
       if (pw===aw) pts+=10;
       if (ph===ah) pts+=3;
       if (pa===aa) pts+=3;
-      if ((ph-pa)===(ah-aa)) pts+=4;
+      if (pw===aw&&(ph-pa)===(ah-aa)) pts+=4;
       return pts;
     }
 
@@ -648,7 +653,7 @@ export default function App() {
       if (pw===aw) pts+=10;
       if (ph===ah) pts+=3;
       if (pa===aa) pts+=3;
-      if ((ph-pa)===(ah-aa)) pts+=4;
+      if (pw===aw&&(ph-pa)===(ah-aa)) pts+=4;
       return pts;
     }
 
@@ -993,7 +998,7 @@ export default function App() {
         if (pw===aw) pts+=10;
         if (ph===ah) pts+=3;
         if (pa===aa) pts+=3;
-        if ((ph-pa)===(ah-aa)) pts+=4;
+        if (pw===aw&&(ph-pa)===(ah-aa)) pts+=4;
         return pts;
       }
 
@@ -1148,7 +1153,7 @@ export default function App() {
         // Exact goals team 2
         if (pa===aa) pts+=3;
         // Exact goal difference
-        if ((ph-pa)===(ah-aa)) pts+=4;
+        if (pw===aw&&(ph-pa)===(ah-aa)) pts+=4;
         return pts;
       }
 
@@ -1661,7 +1666,7 @@ export default function App() {
                           const pw=ph>pa?"h":ph<pa?"a":"d";
                           const resOk=pw===aw;
                           const g1Ok=ph===ah, g2Ok=pa===aa;
-                          const diffOk=(ph-pa)===(ah-aa);
+                          const diffOk=resOk&&(ph-pa)===(ah-aa);
                           let pts=0;
                           if(resOk)pts+=10; if(g1Ok)pts+=3; if(g2Ok)pts+=3; if(diffOk)pts+=4;
                           return [
