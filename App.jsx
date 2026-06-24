@@ -552,8 +552,7 @@ export default function App() {
     }
 
     const standings = [];
-    excelSnap.forEach(d=>{
-      const data = d.data();
+    const VALID_IDS=['dzalles_iterla_com','igarcia_iterla_com','aarias_iterla_com','dioselina','jtorm_iterla_com','laizpurua_leti2','nsantos_iterla_com','ydelacruz_yodalys1','ydelacruz_yodalys2','laizpurua_leti1']; excelSnap.forEach(d=>{ const data=d.data(); if(!VALID_IDS.includes(d.id)) return;
       let total=0;
       for (const m of ALL_MATCHES) {
         const actual = cur[m.id];
@@ -658,8 +657,7 @@ export default function App() {
     }
 
     const standings = [];
-    excelSnap.forEach(d=>{
-      const data = d.data();
+    const VALID_IDS=['dzalles_iterla_com','igarcia_iterla_com','aarias_iterla_com','dioselina','jtorm_iterla_com','laizpurua_leti2','nsantos_iterla_com','ydelacruz_yodalys1','ydelacruz_yodalys2','laizpurua_leti1']; excelSnap.forEach(d=>{ const data=d.data(); if(!VALID_IDS.includes(d.id)) return;
       let total=0, resTotal=0, goalsTotal=0, diffTotal=0;
       for (const m of ALL_MATCHES) {
         const pred = data.predictions?.[m.id];
@@ -1038,8 +1036,7 @@ export default function App() {
 
       // Excel Quiniela standings
       const excelPlayers = {};
-      excelSnap.forEach(d=>{
-        const data = d.data();
+      const VALID_IDS=['dzalles_iterla_com','igarcia_iterla_com','aarias_iterla_com','dioselina','jtorm_iterla_com','laizpurua_leti2','nsantos_iterla_com','ydelacruz_yodalys1','ydelacruz_yodalys2','laizpurua_leti1']; excelSnap.forEach(d=>{ const data=d.data(); if(!VALID_IDS.includes(d.id)) return;
         if(!excelPlayers[data.email]) excelPlayers[data.email]=[];
         excelPlayers[data.email].push({name:data.name, preds:data.predictions||{}});
       });
@@ -1158,8 +1155,7 @@ export default function App() {
       }
 
       const excelPlayers = {};
-      excelSnap.forEach(d=>{
-        const data = d.data();
+      const VALID_IDS=['dzalles_iterla_com','igarcia_iterla_com','aarias_iterla_com','dioselina','jtorm_iterla_com','laizpurua_leti2','nsantos_iterla_com','ydelacruz_yodalys1','ydelacruz_yodalys2','laizpurua_leti1']; excelSnap.forEach(d=>{ const data=d.data(); if(!VALID_IDS.includes(d.id)) return;
         const email = data.email;
         if (!excelPlayers[email]) excelPlayers[email] = [];
         excelPlayers[email].push({name:data.name, preds:data.predictions, total:0});
