@@ -98,6 +98,23 @@ const ALL_MATCHES = [
   { id:"G70", date:"Jun 27", time:"6:30 PM",  kickoff:"2026-06-27T23:30:00Z", home:"DR Congo",      away:"Uzbekistan",     group:"K" },
   { id:"G71", date:"Jun 27", time:"9:00 PM",  kickoff:"2026-06-28T02:00:00Z", home:"Algeria",       away:"Austria",        group:"J" },
   { id:"G72", date:"Jun 27", time:"9:00 PM",  kickoff:"2026-06-28T02:00:00Z", home:"Jordan",        away:"Argentina",      group:"J" },
+  // Round of 32
+  { id:"R32-01", date:"Jun 28", time:"3:00 PM",  kickoff:"2026-06-28T19:00:00-04:00", home:"South Africa", away:"Canada",         stage:"r32" },
+  { id:"R32-02", date:"Jun 29", time:"1:00 PM",  kickoff:"2026-06-29T17:00:00-04:00", home:"Brazil",       away:"Japan",          stage:"r32" },
+  { id:"R32-03", date:"Jun 29", time:"4:30 PM",  kickoff:"2026-06-29T20:30:00-04:00", home:"Germany",      away:"Paraguay",       stage:"r32" },
+  { id:"R32-04", date:"Jun 29", time:"9:00 PM",  kickoff:"2026-06-29T21:00:00-04:00", home:"Netherlands",  away:"Morocco",        stage:"r32" },
+  { id:"R32-05", date:"Jun 30", time:"1:00 PM",  kickoff:"2026-06-30T17:00:00-04:00", home:"Ivory Coast",  away:"Norway",         stage:"r32" },
+  { id:"R32-06", date:"Jun 30", time:"5:00 PM",  kickoff:"2026-06-30T21:00:00-04:00", home:"France",       away:"Sweden",         stage:"r32" },
+  { id:"R32-07", date:"Jun 30", time:"9:00 PM",  kickoff:"2026-07-01T01:00:00-04:00", home:"Mexico",       away:"Ecuador",        stage:"r32" },
+  { id:"R32-08", date:"Jul 1",  time:"12:00 PM", kickoff:"2026-07-01T16:00:00-04:00", home:"England",      away:"DR Congo",       stage:"r32" },
+  { id:"R32-09", date:"Jul 1",  time:"9:00 PM",  kickoff:"2026-07-02T01:00:00-04:00", home:"Belgium",      away:"Senegal",        stage:"r32" },
+  { id:"R32-10", date:"Jul 2",  time:"1:00 AM",  kickoff:"2026-07-02T05:00:00-04:00", home:"USA",          away:"Bosnia & Herz.", stage:"r32" },
+  { id:"R32-11", date:"Jul 2",  time:"3:00 PM",  kickoff:"2026-07-02T19:00:00-04:00", home:"Spain",        away:"Austria",        stage:"r32" },
+  { id:"R32-12", date:"Jul 2",  time:"7:00 PM",  kickoff:"2026-07-02T23:00:00-04:00", home:"Portugal",     away:"Croatia",        stage:"r32" },
+  { id:"R32-13", date:"Jul 2",  time:"11:00 PM", kickoff:"2026-07-03T03:00:00-04:00", home:"Switzerland",  away:"Algeria",        stage:"r32" },
+  { id:"R32-14", date:"Jul 3",  time:"2:00 PM",  kickoff:"2026-07-03T18:00:00-04:00", home:"Australia",    away:"Egypt",          stage:"r32" },
+  { id:"R32-15", date:"Jul 3",  time:"6:00 PM",  kickoff:"2026-07-03T22:00:00-04:00", home:"Argentina",    away:"Cape Verde",     stage:"r32" },
+  { id:"R32-16", date:"Jul 3",  time:"9:30 PM",  kickoff:"2026-07-04T01:30:00-04:00", home:"Colombia",     away:"Ghana",          stage:"r32" },
 ];
 
 const FLAGS = {
@@ -113,6 +130,8 @@ const FLAGS = {
   "Argentina":"🇦🇷","Austria":"🇦🇹","Algeria":"🇩🇿","Jordan":"🇯🇴",
   "Portugal":"🇵🇹","Colombia":"🇨🇴","DR Congo":"🇨🇩","Uzbekistan":"🇺🇿",
   "England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croatia":"🇭🇷","Ghana":"🇬🇭","Panama":"🇵🇦",
+  "DR Congo":"🇨🇩","Algeria":"🇩🇿","Bosnia & Herz.":"🇧🇦","Norway":"🇳🇴",
+  "Sweden":"🇸🇪","Senegal":"🇸🇳","Colombia":"🇨🇴","Cape Verde":"🇨🇻",
 };
 
 function calcScore(pred, actual) {
@@ -228,7 +247,8 @@ function DailyPredictPage({date, userId, userName}) {
     async function load() {
       // Load existing predictions for all today's matches
       const predPromises = allMatches.map(m=>getDoc(doc(db,"match_predictions",`${m.id}_${userId}`)));
-      const aSnap = await getDoc(doc(db,"actuals","results_mp"));
+      const [_s1,_s2] = await Promise.all([getDoc(doc(db,"actuals","results")),getDoc(doc(db,"actuals","results_mp"))]);
+const aSnap = {exists:()=>_s1.exists()||_s2.exists(), data:()=>({...(_s1.exists()?_s1.data():{}),...(_s2.exists()?_s2.data():{})})};
       const cur = aSnap.exists()?aSnap.data():{};
       setActuals(cur);
       const pSnaps = await Promise.all(predPromises);
@@ -381,7 +401,8 @@ function PredictPage({matchId, userId, userName}) {
     async function load() {
       const pSnap = await getDoc(doc(db,"match_predictions",`${matchId}_${userId}`));
       if (pSnap.exists()) { setPred(pSnap.data()); setSubmitted(true); }
-      const aSnap = await getDoc(doc(db,"actuals","results_mp"));
+      const [_s1,_s2] = await Promise.all([getDoc(doc(db,"actuals","results")),getDoc(doc(db,"actuals","results_mp"))]);
+const aSnap = {exists:()=>_s1.exists()||_s2.exists(), data:()=>({...(_s1.exists()?_s1.data():{}),...(_s2.exists()?_s2.data():{})})};
       if (aSnap.exists()&&aSnap.data()[matchId]) setActual(aSnap.data()[matchId]);
       setLoading(false);
     }
@@ -525,14 +546,18 @@ export default function App() {
   }
 
   async function loadActuals() {
-    const snap = await getDoc(doc(db,"actuals","results_mp"));
-    if (snap.exists()) setActuals(snap.data());
+    const [s1,s2] = await Promise.all([
+      getDoc(doc(db,"actuals","results")),
+      getDoc(doc(db,"actuals","results_mp"))
+    ]);
+    const merged = {...(s1.exists()?s1.data():{}),...(s2.exists()?s2.data():{})};
+    setActuals(merged);
   }
 
   async function loadExcelLeaderboard() {
     setLoadingExcelLb(true);
     const [aSnap, excelSnap] = await Promise.all([
-      getDoc(doc(db,"actuals","results_mp")),
+      Promise.all([getDoc(doc(db,"actuals","results")),getDoc(doc(db,"actuals","results_mp"))]).then(([s1,s2])=>({exists:()=>s1.exists()||s2.exists(),data:()=>({...(s1.exists()?s1.data():{}),...(s2.exists()?s2.data():{})})})),
       getDocs(collection(db,"excel_quiniela")),
     ]);
     const cur = aSnap.exists()?aSnap.data():{};
@@ -571,7 +596,7 @@ export default function App() {
     // Load players + actuals in parallel
     const [pSnap, aSnap] = await Promise.all([
       getDocs(collection(db,"players")),
-      getDoc(doc(db,"actuals","results_mp")),
+      Promise.all([getDoc(doc(db,"actuals","results")),getDoc(doc(db,"actuals","results_mp"))]).then(([s1,s2])=>({exists:()=>s1.exists()||s2.exists(),data:()=>({...(s1.exists()?s1.data():{}),...(s2.exists()?s2.data():{})})})),
     ]);
     const playerList = [];
     pSnap.forEach(d=>playerList.push({id:d.id,...d.data()}));
@@ -611,7 +636,7 @@ export default function App() {
   async function loadLeaderboard() {
     setLoadingLb(true);
     const [aSnap, pSnap, allPredsSnap] = await Promise.all([
-      getDoc(doc(db,"actuals","results_mp")),
+      Promise.all([getDoc(doc(db,"actuals","results")),getDoc(doc(db,"actuals","results_mp"))]).then(([s1,s2])=>({exists:()=>s1.exists()||s2.exists(),data:()=>({...(s1.exists()?s1.data():{}),...(s2.exists()?s2.data():{})})})),
       getDocs(collection(db,"players")),
       getDocs(collection(db,"match_predictions")),
     ]);
@@ -637,7 +662,7 @@ export default function App() {
   async function loadExcelLeaderboard() {
     setLoadingExcelLb(true);
     const [aSnap, excelSnap] = await Promise.all([
-      getDoc(doc(db,"actuals","results_mp")),
+      Promise.all([getDoc(doc(db,"actuals","results")),getDoc(doc(db,"actuals","results_mp"))]).then(([s1,s2])=>({exists:()=>s1.exists()||s2.exists(),data:()=>({...(s1.exists()?s1.data():{}),...(s2.exists()?s2.data():{})})})),
       getDocs(collection(db,"excel_quiniela")),
     ]);
     const cur = aSnap.exists()?aSnap.data():{};
@@ -691,7 +716,7 @@ export default function App() {
     setLoadingCuentas(true);
     const [allPredsSnap, aSnap, pSnap, settledSnap] = await Promise.all([
       getDocs(collection(db,"match_predictions")),
-      getDoc(doc(db,"actuals","results_mp")),
+      Promise.all([getDoc(doc(db,"actuals","results")),getDoc(doc(db,"actuals","results_mp"))]).then(([s1,s2])=>({exists:()=>s1.exists()||s2.exists(),data:()=>({...(s1.exists()?s1.data():{}),...(s2.exists()?s2.data():{})})})),
       getDocs(collection(db,"players")),
       getDoc(doc(db,"cuentas","settled")),
     ]);
@@ -979,7 +1004,7 @@ export default function App() {
 
       const [allPredsSnap, aSnap, pSnap, excelSnap] = await Promise.all([
         getDocs(collection(db,"match_predictions")),
-        getDoc(doc(db,"actuals","results_mp")),
+        Promise.all([getDoc(doc(db,"actuals","results")),getDoc(doc(db,"actuals","results_mp"))]).then(([s1,s2])=>({exists:()=>s1.exists()||s2.exists(),data:()=>({...(s1.exists()?s1.data():{}),...(s2.exists()?s2.data():{})})})),
         getDocs(collection(db,"players")),
         getDocs(collection(db,"excel_quiniela")),
       ]);
@@ -1113,7 +1138,7 @@ export default function App() {
       // ── Load all data in parallel ──
       const [allPredsSnap, aSnap, pSnap, excelSnap] = await Promise.all([
         getDocs(collection(db,"match_predictions")),
-        getDoc(doc(db,"actuals","results_mp")),
+        Promise.all([getDoc(doc(db,"actuals","results")),getDoc(doc(db,"actuals","results_mp"))]).then(([s1,s2])=>({exists:()=>s1.exists()||s2.exists(),data:()=>({...(s1.exists()?s1.data():{}),...(s2.exists()?s2.data():{})})})),
         getDocs(collection(db,"players")),
         getDocs(collection(db,"excel_quiniela")),
       ]);
@@ -1441,7 +1466,6 @@ export default function App() {
                 {sendingLb?`Sending standings...`:`📊 Send Quiniela Standings to ${players.filter(p=>!p.offline).length} players`}
               </button>
               {sendLbMsg&&<div style={{color:T.green,fontWeight:800,textAlign:"center",marginBottom:8}}>{sendLbMsg}</div>}
-
               <button onClick={sendDailySummaryEmail} disabled={sendingDaily}
                 style={{width:"100%",padding:14,fontSize:15,fontWeight:900,background:`linear-gradient(135deg,#7b5fd6,#5a44a8)`,color:"#fff",border:"none",borderRadius:12,cursor:"pointer",opacity:sendingDaily?0.6:1}}>
                 {sendingDaily?"Enviando resumen...":`📨 Enviar resumen de hoy a ${players.filter(p=>!p.offline).length} jugadores`}
@@ -1452,21 +1476,54 @@ export default function App() {
 
           {playedMatches.length===0?(
             <div style={{textAlign:"center",color:T.muted,padding:40}}>No matches have started yet.</div>
-          ):playedMatches.map(m=>(
-            <div key={m.id} style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"12px 16px",marginBottom:8}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,flex:1}}>
-                  <span style={{fontSize:18}}>{FLAGS[m.home]||"🏳️"}</span>
-                  <span style={{color:T.white,fontSize:13,fontWeight:600}}>{m.home}</span>
+          ):(()=>{
+            // Sort: matches WITHOUT result first (next to update), then by date descending
+            const withResult = playedMatches.filter(m=>actuals[m.id]?.h!==""&&actuals[m.id]?.h!=null);
+            const withoutResult = playedMatches.filter(m=>!actuals[m.id]?.h&&actuals[m.id]?.h!==0);
+            const sorted = [...withoutResult, ...withResult];
+
+            // Group by date
+            const byDate = {};
+            for (const m of sorted) {
+              if (!byDate[m.date]) byDate[m.date] = [];
+              byDate[m.date].push(m);
+            }
+
+            return Object.entries(byDate).map(([date, matches])=>(
+              <div key={date}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8,marginTop:12}}>
+                  <div style={{height:1,flex:1,background:T.border}}/>
+                  <div style={{color:T.gold,fontSize:12,fontWeight:800,background:T.bgDeep,padding:"3px 12px",borderRadius:20,border:`1px solid ${T.border}`}}>📅 {date}</div>
+                  <div style={{height:1,flex:1,background:T.border}}/>
                 </div>
-                <ScoreInput h={actuals[m.id]?.h??""} a={actuals[m.id]?.a??""} onChange={val=>setActuals(p=>({...p,[m.id]:{...p[m.id],...val}}))} disabled={false}/>
-                <div style={{display:"flex",alignItems:"center",gap:6,flex:1,justifyContent:"flex-end"}}>
-                  <span style={{color:T.white,fontSize:13,fontWeight:600}}>{m.away}</span>
-                  <span style={{fontSize:18}}>{FLAGS[m.away]||"🏳️"}</span>
-                </div>
+                {matches.map(m=>{
+                  const hasResult = actuals[m.id]?.h!==""&&actuals[m.id]?.h!=null;
+                  return (
+                    <div key={m.id} style={{background:T.bgCard,border:`1px solid ${hasResult?T.border:"#c9a03044"}`,borderRadius:12,padding:"12px 16px",marginBottom:8}}>
+                      {!hasResult&&<div style={{color:T.gold,fontSize:10,fontWeight:800,marginBottom:6}}>⏳ PENDING RESULT</div>}
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6,flex:1}}>
+                          <span style={{fontSize:18}}>{FLAGS[m.home]||"🏳️"}</span>
+                          <span style={{color:T.white,fontSize:13,fontWeight:600}}>{m.home}</span>
+                        </div>
+                        <ScoreInput h={actuals[m.id]?.h??""} a={actuals[m.id]?.a??""} onChange={val=>setActuals(p=>({...p,[m.id]:{...p[m.id],...val}}))} disabled={false}/>
+                        <div style={{display:"flex",alignItems:"center",gap:6,flex:1,justifyContent:"flex-end"}}>
+                          <span style={{color:T.white,fontSize:13,fontWeight:600}}>{m.away}</span>
+                          <span style={{fontSize:18}}>{FLAGS[m.away]||"🏳️"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-          ))}
+            ));
+          })()}
+
+          {/* Go to top button */}
+          <button onClick={()=>window.scrollTo({top:0,behavior:"smooth"})}
+            style={{position:"fixed",bottom:80,right:16,width:44,height:44,borderRadius:"50%",background:T.gold,color:T.bgDeep,border:"none",fontSize:20,cursor:"pointer",fontWeight:900,boxShadow:"0 2px 12px #0008",zIndex:100}}>
+            ↑
+          </button>
         </div>
       )}
 
