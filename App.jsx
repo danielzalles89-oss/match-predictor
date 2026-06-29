@@ -877,8 +877,11 @@ export default function App() {
 
   async function saveActuals() {
     setSaving(true);
+    console.log("Saving actuals:", JSON.stringify(actuals));
+    const keys = Object.keys(actuals);
+    console.log("Keys to save:", keys.length, keys.slice(0,5));
     await setDoc(doc(db,"actuals","results_mp"),actuals);
-    setSaveMsg("✓ Results saved!");
+    setSaveMsg("✓ Results saved! (" + keys.length + " matches)");
     setTimeout(()=>setSaveMsg(""),2500);
     setSaving(false);
   }
