@@ -134,6 +134,14 @@ const FLAGS = {
   "Sweden":"🇸🇪","Senegal":"🇸🇳","Colombia":"🇨🇴","Cape Verde":"🇨🇻",
 };
 
+function correctResult(pred, actual) {
+  if (!actual||actual.h==null||actual.a==null||actual.h===""||actual.a==="") return false;
+  if (!pred||pred.h==null||pred.a==null||pred.h===""||pred.a==="") return false;
+  const ph=Number(pred.h),pa=Number(pred.a),ah=Number(actual.h),aa=Number(actual.a);
+  const pw=ph>pa?"h":ph<pa?"a":"d", aw=ah>aa?"h":ah<aa?"a":"d";
+  return pw===aw;
+}
+
 function calcScore(pred, actual) {
   if (!actual||actual.h==null||actual.a==null||actual.h===""||actual.a==="") return 0;
   if (!pred||pred.h==null||pred.a==null||pred.h===""||pred.a==="") return 0;
@@ -737,7 +745,7 @@ export default function App() {
         const pred = predsByKey[`${m.id}_${p.id}`];
         if (pred&&pred.h!==""&&pred.a!=="") {
           predictors.push(p);
-          if (calcScore(pred,actual)===1) winners.push(p);
+          if (correctResult(pred,actual)) winners.push(p);
         }
       }
       return {match:m,actual,predictors,winners,settled:settledIds.includes(m.id)};
@@ -1048,7 +1056,7 @@ export default function App() {
         const actual = cur[m.id];
         const winners = playerList.filter(p=>{
           const pred = predsByKey[`${m.id}_${p.id}`];
-          return pred && calcScore(pred,actual)===1;
+          return pred && correctResult(pred,actual);
         });
         const winnerHtml = winners.length>0
           ? `<div style="background:#1a1a00;border-radius:8px;padding:8px 12px;margin-top:8px"><span style="color:#f5c842;font-size:12px;font-weight:700">🎯 Ganador${winners.length>1?'es':''}: ${winners.map(w=>w.name).join(', ')}</span></div>`
@@ -1156,7 +1164,7 @@ export default function App() {
           if (!actual||actual.h===""||actual.a==="") continue;
           played++;
           const data = predsByKey[`${m.id}_${p.id}`];
-          if (data && calcScore(data,actual)===1) wins++;
+          if (data && correctResult(data,actual)) wins++;
         }
         return {...p, wins, played};
       }).sort((a,b)=>b.wins-a.wins);
