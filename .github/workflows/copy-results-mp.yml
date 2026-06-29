@@ -1,0 +1,37 @@
+name: Copy Results to results_mp
+
+on:
+  workflow_dispatch:
+
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install firebase-admin
+        run: npm install firebase-admin
+
+      - name: Copy actuals/results to actuals/results_mp
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          cat > copy.mjs << 'JSEOF'
+          import { initializeApp, cert } from 'firebase-admin/app';
+          import { getFirestore } from 'firebase-admin/firestore';
+
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          initializeApp({ credential: cert(serviceAccount) });
+          const db = getFirestore();
+
+          // Read from results
+          const src = await db.collection('actuals').doc('results').get();
+          if (!src.exists) { console.log('No results doc found!'); process.exit(1); }
+          
+          const data = src.data();
+          console.log('Found', Object.keys(data).length, 'results');
+          console.log('Sample:', JSON.stringify(Object.entries(data).slice(0,3)));
+
+          // Write to results_mp (merge so we don't lose anything already there)
+          await db.collection('actuals').doc('results_mp').set(data, { merge: true });
+          console.log('✅ Copied to results_mp!');
+          JSEOF
+          node copy.mjs
