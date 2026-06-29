@@ -137,9 +137,7 @@ const FLAGS = {
 function correctResult(pred, actual) {
   if (!actual||actual.h==null||actual.a==null||actual.h===""||actual.a==="") return false;
   if (!pred||pred.h==null||pred.a==null||pred.h===""||pred.a==="") return false;
-  const ph=Number(pred.h),pa=Number(pred.a),ah=Number(actual.h),aa=Number(actual.a);
-  const pw=ph>pa?"h":ph<pa?"a":"d", aw=ah>aa?"h":ah<aa?"a":"d";
-  return pw===aw;
+  return Number(pred.h)===Number(actual.h) && Number(pred.a)===Number(actual.a);
 }
 
 function calcScore(pred, actual) {
