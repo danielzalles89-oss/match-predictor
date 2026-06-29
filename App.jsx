@@ -323,9 +323,9 @@ const aSnap = {exists:()=>_s1.exists()||_s2.exists(), data:()=>({...(_s1.exists(
           return (
             <div key={m.id} style={{
               background:"rgba(0,33,113,0.7)",backdropFilter:"blur(10px)",
-              border:`1px solid ${pts===1?T.gold:locked?T.border:T.teal}`,
+              border:`1px solid ${pts>0?T.gold:locked?T.border:T.teal}`,
               borderRadius:16,padding:"18px 16px",marginBottom:12,
-              boxShadow:pts===1?`0 0 16px ${T.gold}44`:"none",
+              boxShadow:pts>0?`0 0 16px ${T.gold}44`:"none",
             }}>
               {/* Match header */}
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:4}}>
@@ -353,7 +353,7 @@ const aSnap = {exists:()=>_s1.exists()||_s2.exists(), data:()=>({...(_s1.exists(
                     <div style={{textAlign:"center"}}>
                       <div style={{color:T.muted,fontSize:10,textTransform:"uppercase",letterSpacing:1}}>Result</div>
                       <div style={{color:T.gold,fontWeight:900,fontFamily:"monospace",fontSize:16}}>{actual.h}:{actual.a}</div>
-                      {pts!==null&&<span style={{fontSize:11,fontWeight:800,color:pts===1?T.gold:T.red}}>{pts===1?"🎯 +1":"✗ 0"}</span>}
+                      {pts!==null&&<span style={{fontSize:11,fontWeight:800,color:pts>0?T.gold:T.red}}>{pts>0?`🎯 +${pts}`:"✗ 0"}</span>}
                     </div>
                   )}
                 </div>
@@ -481,8 +481,8 @@ const aSnap = {exists:()=>_s1.exists()||_s2.exists(), data:()=>({...(_s1.exists(
               <div style={{color:T.light,fontSize:11,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Final Result</div>
               <div style={{color:T.gold,fontSize:32,fontWeight:900,fontFamily:"'Courier New',monospace",marginBottom:8}}>{actual.h} : {actual.a}</div>
               {pts!==null&&(
-                <span style={{display:"inline-block",background:pts===1?"rgba(245,200,66,0.15)":"rgba(231,76,60,0.15)",color:pts===1?T.gold:T.red,padding:"5px 18px",borderRadius:20,fontSize:13,fontWeight:800}}>
-                  {pts===1?"🎯 Exact score! +1 pt":"✗ Wrong score"}
+                <span style={{display:"inline-block",background:pts>0?"rgba(245,200,66,0.15)":"rgba(231,76,60,0.15)",color:pts>0?T.gold:T.red,padding:"5px 18px",borderRadius:20,fontSize:13,fontWeight:800}}>
+                  {pts>0?`🎯 +${pts} pts`:"✗ Wrong score"}
                 </span>
               )}
             </div>
@@ -629,7 +629,7 @@ export default function App() {
         const key = `${m.id}_${p.id}`;
         const data = predsByMatchPlayer[key];
         if (data && data.h!=="" && data.a!=="") {
-          preds.push({ name: p.name, h: data.h, a: data.a, pts: calcScore(data, cur[m.id]||{}), playerId: p.id });
+          const actual_m = cur[m.id]||{}; preds.push({ name: p.name, h: data.h, a: data.a, pts: calcScore(data, actual_m), isWinner: correctResult(data, actual_m), playerId: p.id });
         }
       }
       const hasResult = actual && actual.h!=="" && actual.a!=="";
@@ -1546,7 +1546,7 @@ export default function App() {
             <div style={{textAlign:"center",color:T.muted,padding:40}}>No predictions yet.</div>
           ):Object.values(allPredictions).map(({match:m, actual, preds, playerList:matchPlayers})=>{
             const hasResult = actual&&actual.h!==""&&actual.a!=="";
-            const winners = preds.filter(p=>p.pts===1);
+            const winners = preds.filter(p=>p.isWinner);
             const participated = preds.length;
             const allPlayers = matchPlayers||players;
             return (
@@ -1609,7 +1609,7 @@ export default function App() {
                   </div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                     {preds.map((p,i)=>{
-                      const isWinner = p.pts===1;
+                      const isWinner = p.isWinner;
                       const playerObj = allPlayers.find(pl=>pl.name===p.name);
                       const isOffline = playerObj&&(playerObj.offline||!playerObj.email);
                       if (isOffline) {
