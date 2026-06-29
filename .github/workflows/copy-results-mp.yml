@@ -14,23 +14,22 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT" > serviceAccount.json
           cat > copy.mjs << 'JSEOF'
           import { initializeApp, cert } from 'firebase-admin/app';
           import { getFirestore } from 'firebase-admin/firestore';
+          import { readFileSync } from 'fs';
 
-          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          const serviceAccount = JSON.parse(readFileSync('./serviceAccount.json', 'utf8'));
           initializeApp({ credential: cert(serviceAccount) });
           const db = getFirestore();
 
-          // Read from results
           const src = await db.collection('actuals').doc('results').get();
           if (!src.exists) { console.log('No results doc found!'); process.exit(1); }
           
           const data = src.data();
           console.log('Found', Object.keys(data).length, 'results');
-          console.log('Sample:', JSON.stringify(Object.entries(data).slice(0,3)));
 
-          // Write to results_mp (merge so we don't lose anything already there)
           await db.collection('actuals').doc('results_mp').set(data, { merge: true });
           console.log('✅ Copied to results_mp!');
           JSEOF
