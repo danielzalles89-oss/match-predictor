@@ -622,6 +622,7 @@ export default function App() {
 
     // Build result — show matches with results OR any predictions
     const result = {};
+    let debugCount = 0;
     for (const m of ALL_MATCHES.slice().reverse()) {
       const actual = cur[m.id];
       const preds = [];
@@ -629,7 +630,13 @@ export default function App() {
         const key = `${m.id}_${p.id}`;
         const data = predsByMatchPlayer[key];
         if (data && data.h!=="" && data.a!=="") {
-          const actual_m = cur[m.id]||{}; preds.push({ name: p.name, h: data.h, a: data.a, pts: calcScore(data, actual_m), isWinner: correctResult(data, actual_m), playerId: p.id });
+          const actual_m = cur[m.id]||{};
+          const isWin = correctResult(data, actual_m);
+          if (debugCount < 5) {
+            console.log(`DEBUG ${m.id} ${p.name}: pick=${data.h}-${data.a} actual=${actual_m.h}-${actual_m.a} isWinner=${isWin}`);
+            debugCount++;
+          }
+          preds.push({ name: p.name, h: data.h, a: data.a, pts: calcScore(data, actual_m), isWinner: isWin, playerId: p.id });
         }
       }
       const hasResult = actual && actual.h!=="" && actual.a!=="";
