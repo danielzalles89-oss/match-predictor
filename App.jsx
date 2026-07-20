@@ -1892,9 +1892,10 @@ export default function App() {
               <div style={{textAlign:"center",color:T.muted,padding:40}}>Cargando...</div>
             ):(()=>{
               const {balanceList, settlements, totalMatches} = totalsData;
+              const [expandedPlayer, setExpandedPlayer] = React.useState(null);
               return (<>
                 <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:14,marginBottom:16,textAlign:"center"}}>
-                  <div style={{color:T.muted,fontSize:12}}>Total partidos con ganador</div>
+                  <div style={{color:T.muted,fontSize:12}}>Total partidos jugados con ganador</div>
                   <div style={{color:T.gold,fontWeight:900,fontSize:24}}>{totalMatches}</div>
                 </div>
 
@@ -1904,37 +1905,65 @@ export default function App() {
                   {balanceList.map((p,i)=>{
                     const pending = p.pendingNet;
                     const color = pending>0?"#2ecc71":pending<0?"#e74c3c":T.muted;
+                    const isExpanded = expandedPlayer===p.id;
                     return (
-                      <div key={p.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderTop:i>0?`1px solid ${T.border}33`:"none"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          <span style={{color:T.muted,fontSize:12,width:20}}>#{i+1}</span>
-                          <span style={{color:T.white,fontWeight:700,fontSize:14}}>{p.name}</span>
+                      <div key={p.id}>
+                        <div onClick={()=>setExpandedPlayer(isExpanded?null:p.id)}
+                          style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderTop:i>0?`1px solid ${T.border}33`:"none",cursor:"pointer"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <span style={{color:T.muted,fontSize:12,width:20}}>#{i+1}</span>
+                            <span style={{color:T.white,fontWeight:700,fontSize:14}}>{p.name}</span>
+                            <span style={{color:T.muted,fontSize:11}}>({p.wins}W · {p.losses}L)</span>
+                          </div>
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <span style={{color,fontWeight:900,fontSize:16,minWidth:60,textAlign:"right"}}>
+                              {pending===0?"—":pending>0?`+$${Math.abs(pending).toFixed(2)}`:`-$${Math.abs(pending).toFixed(2)}`}
+                            </span>
+                            <span style={{color:T.muted,fontSize:12}}>{isExpanded?"▲":"▼"}</span>
+                          </div>
                         </div>
-                        <div style={{display:"flex",alignItems:"center",gap:16}}>
-                          <span style={{color:"#2ecc71",fontSize:12}}>🏆 {p.wins}W</span>
-                          <span style={{color:"#e74c3c",fontSize:12}}>💸 {p.losses}L</span>
-                          <span style={{color,fontWeight:900,fontSize:16,minWidth:60,textAlign:"right"}}>
-                            {pending>0?"+":""}{Math.round(pending*100)/100 === 0 ? "—" : `$${Math.abs(Math.round(pending*100)/100).toFixed(2)}`}
-                            {pending>0?" 📈":pending<0?" 📉":""}
-                          </span>
-                        </div>
+                        {isExpanded&&(
+                          <div style={{background:T.bgDeep,borderRadius:8,padding:10,marginBottom:8}}>
+                            {p.wonMatches.length===0?(
+                              <div style={{color:T.muted,fontSize:12,textAlign:"center"}}>No ha ganado ningún partido aún</div>
+                            ):(
+                              <>
+                                <div style={{color:T.gold,fontSize:11,fontWeight:800,marginBottom:6}}>🏆 Partidos ganados:</div>
+                                {p.wonMatches.map((w,j)=>(
+                                  <div key={j} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0",borderTop:j>0?`1px solid ${T.border}22`:"none"}}>
+                                    <div>
+                                      <span style={{color:T.white,fontSize:12}}>{w.match}</span>
+                                      <span style={{color:T.muted,fontSize:10,marginLeft:6}}>({w.date})</span>
+                                      {w.settled&&<span style={{color:"#2ecc71",fontSize:10,marginLeft:4}}>✓ saldado</span>}
+                                    </div>
+                                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                                      <span style={{color:T.muted,fontSize:11,fontFamily:"monospace"}}>{w.pred}</span>
+                                      <span style={{color:"#2ecc71",fontWeight:700,fontSize:12}}>+${w.prize.toFixed(2)}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
 
-                {/* Pending settlements */}
+                {/* Pending settlements - simplified total per person */}
                 <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:14}}>
-                  <div style={{color:T.gold,fontWeight:900,fontSize:14,marginBottom:12}}>⚡ Pendiente por Saldar</div>
-                  {settlements.length===0?(
+                  <div style={{color:T.gold,fontWeight:900,fontSize:14,marginBottom:4}}>⚡ Pendiente por Saldar</div>
+                  <div style={{color:T.muted,fontSize:11,marginBottom:12}}>Monto total que cada persona debe pagar</div>
+                  {balanceList.filter(p=>p.pendingNet<-0.001).length===0?(
                     <div style={{color:"#2ecc71",textAlign:"center",padding:16,fontWeight:700}}>✅ Todo saldado</div>
-                  ):settlements.map((s,i)=>(
-                    <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderTop:i>0?`1px solid ${T.border}33`:"none"}}>
-                      <span style={{color:"#e74c3c",fontWeight:700}}>{s.from}</span>
-                      <span style={{color:T.muted,fontSize:12}}>debe pagar</span>
-                      <span style={{color:T.gold,fontWeight:900,fontSize:16}}>${s.amount.toFixed(2)}</span>
-                      <span style={{color:T.muted,fontSize:12}}>a</span>
-                      <span style={{color:"#2ecc71",fontWeight:700}}>{s.to}</span>
+                  ):balanceList.filter(p=>p.pendingNet<-0.001).sort((a,b)=>a.pendingNet-b.pendingNet).map((p,i)=>(
+                    <div key={p.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0",borderTop:i>0?`1px solid ${T.border}33`:"none"}}>
+                      <span style={{color:"#e74c3c",fontWeight:700,fontSize:14}}>{p.name}</span>
+                      <div style={{textAlign:"right"}}>
+                        <div style={{color:T.gold,fontWeight:900,fontSize:18}}>${Math.abs(p.pendingNet).toFixed(2)}</div>
+                        <div style={{color:T.muted,fontSize:10}}>pendiente</div>
+                      </div>
                     </div>
                   ))}
                 </div>
