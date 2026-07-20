@@ -763,7 +763,7 @@ export default function App() {
     const allPlayedMatches = ALL_MATCHES.filter(m=>cur[m.id]&&cur[m.id].h!==""&&cur[m.id].a!=="");
 
     const balance = {};
-    playerList.forEach(p=>{ balance[p.id]={...p,earned:0,paid:0,net:0,wins:0,losses:0,settled:0}; });
+    playerList.forEach(p=>{ balance[p.id]={...p,earned:0,paid:0,net:0,wins:0,losses:0,settled:0,wonMatches:[]}; });
 
     for (const m of allPlayedMatches) {
       const actual = cur[m.id];
@@ -771,8 +771,8 @@ export default function App() {
       for (const p of playerList) {
         const pred = predsByKey[`${m.id}_${p.id}`];
         if (pred&&pred.h!==""&&pred.a!=="") {
-          predictors.push(p);
-          if (correctResult(pred,actual)) winners.push(p);
+          predictors.push({...p,pred});
+          if (correctResult(pred,actual)) winners.push({...p,pred});
         }
       }
       if (winners.length===0) continue;
@@ -791,6 +791,14 @@ export default function App() {
         balance[winner.id].net += prizePerWinner;
         balance[winner.id].wins += 1;
         if (isSettled) balance[winner.id].settled += prizePerWinner;
+        balance[winner.id].wonMatches.push({
+          match:`${m.home} vs ${m.away}`,
+          date: m.date,
+          pred:`${winner.pred.h}-${winner.pred.a}`,
+          actual:`${actual.h}-${actual.a}`,
+          prize: Math.round(prizePerWinner*100)/100,
+          settled: isSettled,
+        });
       }
     }
 
