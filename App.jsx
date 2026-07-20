@@ -740,9 +740,10 @@ export default function App() {
     { label:"Semana 5", dates:["Jul 15","Jul 16","Jul 17","Jul 18","Jul 19"] },
   ];
 
-  const [cuentasTab, setCuentasTab] = useState("weekly"); // "weekly" | "totals"
+  const [cuentasTab, setCuentasTab] = useState("weekly");
   const [totalsData, setTotalsData] = useState(null);
   const [loadingTotals, setLoadingTotals] = useState(false);
+  const [expandedPlayer, setExpandedPlayer] = useState(null);
 
   async function loadTotals() {
     setLoadingTotals(true);
@@ -1892,7 +1893,6 @@ export default function App() {
               <div style={{textAlign:"center",color:T.muted,padding:40}}>Cargando...</div>
             ):(()=>{
               const {balanceList, settlements, totalMatches} = totalsData;
-              const [expandedPlayer, setExpandedPlayer] = React.useState(null);
               return (<>
                 <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:14,marginBottom:16,textAlign:"center"}}>
                   <div style={{color:T.muted,fontSize:12}}>Total partidos jugados con ganador</div>
