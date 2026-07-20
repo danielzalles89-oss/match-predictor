@@ -130,8 +130,6 @@ const FLAGS = {
   "Argentina":"🇦🇷","Austria":"🇦🇹","Algeria":"🇩🇿","Jordan":"🇯🇴",
   "Portugal":"🇵🇹","Colombia":"🇨🇴","DR Congo":"🇨🇩","Uzbekistan":"🇺🇿",
   "England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croatia":"🇭🇷","Ghana":"🇬🇭","Panama":"🇵🇦",
-  "DR Congo":"🇨🇩","Algeria":"🇩🇿","Bosnia & Herz.":"🇧🇦","Norway":"🇳🇴",
-  "Sweden":"🇸🇪","Senegal":"🇸🇳","Colombia":"🇨🇴","Cape Verde":"🇨🇻",
 };
 
 function correctResult(pred, actual) {
@@ -155,7 +153,17 @@ function calcScore(pred, actual) {
   return pts;
 }
 
-function isLocked(match) { return new Date() >= new Date(match.kickoff); }
+const BLOCKED_UIDS = ["FXxzxIOi98YIVmXfhWhuNKwg6cn2","IZ0zJImSUAUU7YCbCXp8k5UVOLs1"];
+
+function isLocked(match) {
+  const now = new Date();
+  if (now >= new Date(match.kickoff)) return true;
+  const matchTime = new Date(match.kickoff);
+  return ALL_MATCHES.some(m => {
+    const t = new Date(m.kickoff);
+    return t > matchTime && now >= t;
+  });
+}
 
 // ─── THEME ────────────────────────────────────────────────────────────────────
 const T = {
@@ -537,7 +545,14 @@ export default function App() {
 
   useEffect(()=>{
     const unsub = onAuthStateChanged(auth, async u => {
-      setUser(u); setAuthLoading(false);
+      setAuthLoading(false);
+      if (u && BLOCKED_UIDS.includes(u.uid)) {
+        await signOut(auth);
+        setUser(null);
+        alert("Your account no longer has access to this app.");
+        return;
+      }
+      setUser(u);
       if (u) { await loadPlayers(); await loadActuals(); }
     });
     return unsub;
@@ -724,6 +739,82 @@ export default function App() {
     { label:"Semana 4", dates:["Jul 8","Jul 9","Jul 10","Jul 11","Jul 12","Jul 13","Jul 14"] },
     { label:"Semana 5", dates:["Jul 15","Jul 16","Jul 17","Jul 18","Jul 19"] },
   ];
+
+  const [cuentasTab, setCuentasTab] = useState("weekly"); // "weekly" | "totals"
+  const [totalsData, setTotalsData] = useState(null);
+  const [loadingTotals, setLoadingTotals] = useState(false);
+
+  async function loadTotals() {
+    setLoadingTotals(true);
+    const [allPredsSnap, aSnap, pSnap, settledSnap] = await Promise.all([
+      getDocs(collection(db,"match_predictions")),
+      Promise.all([getDoc(doc(db,"actuals","results")),getDoc(doc(db,"actuals","results_mp"))]).then(([s1,s2])=>({exists:()=>s1.exists()||s2.exists(),data:()=>({...(s1.exists()?s1.data():{}),...(s2.exists()?s2.data():{})})})),
+      getDocs(collection(db,"players")),
+      getDoc(doc(db,"cuentas","settled")),
+    ]);
+    const cur = aSnap.exists()?aSnap.data():{};
+    const playerList = [];
+    pSnap.forEach(d=>playerList.push({id:d.id,...d.data()}));
+    const predsByKey = {};
+    allPredsSnap.forEach(d=>{ predsByKey[d.id]=d.data(); });
+    const settledIds = settledSnap.exists()?(settledSnap.data().ids||[]):[];
+
+    // All matches with results
+    const allPlayedMatches = ALL_MATCHES.filter(m=>cur[m.id]&&cur[m.id].h!==""&&cur[m.id].a!=="");
+
+    const balance = {};
+    playerList.forEach(p=>{ balance[p.id]={...p,earned:0,paid:0,net:0,wins:0,losses:0,settled:0}; });
+
+    for (const m of allPlayedMatches) {
+      const actual = cur[m.id];
+      const predictors = [], winners = [];
+      for (const p of playerList) {
+        const pred = predsByKey[`${m.id}_${p.id}`];
+        if (pred&&pred.h!==""&&pred.a!=="") {
+          predictors.push(p);
+          if (correctResult(pred,actual)) winners.push(p);
+        }
+      }
+      if (winners.length===0) continue;
+      const isSettled = settledIds.includes(m.id);
+      const losers = predictors.filter(p=>!winners.find(w=>w.id===p.id));
+      const prizePerWinner = losers.length/winners.length;
+
+      for (const loser of losers) {
+        balance[loser.id].paid += 1;
+        balance[loser.id].net -= 1;
+        balance[loser.id].losses += 1;
+        if (isSettled) balance[loser.id].settled -= 1;
+      }
+      for (const winner of winners) {
+        balance[winner.id].earned += prizePerWinner;
+        balance[winner.id].net += prizePerWinner;
+        balance[winner.id].wins += 1;
+        if (isSettled) balance[winner.id].settled += prizePerWinner;
+      }
+    }
+
+    const balanceList = Object.values(balance).sort((a,b)=>b.net-a.net);
+
+    // Net PENDING (excluding settled)
+    const pendingBalance = balanceList.map(p=>({...p, pendingNet: p.net - p.settled}));
+    const debtors = pendingBalance.filter(p=>p.pendingNet<-0.001).map(p=>({name:p.name,rem:Math.abs(p.pendingNet)}));
+    const creditors = pendingBalance.filter(p=>p.pendingNet>0.001).map(p=>({name:p.name,rem:p.pendingNet}));
+
+    const settlements = [];
+    let di=0, ci=0;
+    while (di<debtors.length && ci<creditors.length) {
+      const d=debtors[di], c=creditors[ci];
+      const amt = Math.min(d.rem, c.rem);
+      if (amt > 0.001) settlements.push({from:d.name, to:c.name, amount:Math.round(amt*100)/100});
+      d.rem -= amt; c.rem -= amt;
+      if (d.rem <= 0.001) di++;
+      if (c.rem <= 0.001) ci++;
+    }
+
+    setTotalsData({balanceList: pendingBalance, settlements, totalMatches: allPlayedMatches.length});
+    setLoadingTotals(false);
+  }
 
   async function loadCuentas(weekIdx) {
     setLoadingCuentas(true);
@@ -1771,6 +1862,81 @@ export default function App() {
             <h2 style={{color:T.gold,fontWeight:900,margin:"4px 0 2px",fontSize:20}}>Cuentas</h2>
             <div style={{color:T.muted,fontSize:12}}>$1 por predicción · Solo cuentan partidos con ganador</div>
           </div>
+
+          {/* Sub-tabs */}
+          <div style={{display:"flex",gap:6,marginBottom:16,background:T.bgDeep,padding:6,borderRadius:10,border:`1px solid ${T.border}`}}>
+            <button onClick={()=>setCuentasTab("weekly")}
+              style={{flex:1,padding:"8px",borderRadius:8,border:"none",cursor:"pointer",fontWeight:800,fontSize:12,
+                background:cuentasTab==="weekly"?T.bgCard:"transparent",color:cuentasTab==="weekly"?T.gold:T.muted}}>
+              📅 Por Semana
+            </button>
+            <button onClick={()=>{setCuentasTab("totals");loadTotals();}}
+              style={{flex:1,padding:"8px",borderRadius:8,border:"none",cursor:"pointer",fontWeight:800,fontSize:12,
+                background:cuentasTab==="totals"?T.bgCard:"transparent",color:cuentasTab==="totals"?T.gold:T.muted}}>
+              📊 Totales
+            </button>
+          </div>
+
+          {cuentasTab==="totals"&&(
+            loadingTotals?(
+              <div style={{textAlign:"center",color:T.muted,padding:40}}>Calculando totales...</div>
+            ):!totalsData?(
+              <div style={{textAlign:"center",color:T.muted,padding:40}}>Cargando...</div>
+            ):(()=>{
+              const {balanceList, settlements, totalMatches} = totalsData;
+              return (<>
+                <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:14,marginBottom:16,textAlign:"center"}}>
+                  <div style={{color:T.muted,fontSize:12}}>Total partidos con ganador</div>
+                  <div style={{color:T.gold,fontWeight:900,fontSize:24}}>{totalMatches}</div>
+                </div>
+
+                {/* Balance table */}
+                <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:14,marginBottom:16}}>
+                  <div style={{color:T.gold,fontWeight:900,fontSize:14,marginBottom:12}}>💰 Balance Total</div>
+                  {balanceList.map((p,i)=>{
+                    const pending = p.pendingNet;
+                    const color = pending>0?"#2ecc71":pending<0?"#e74c3c":T.muted;
+                    return (
+                      <div key={p.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderTop:i>0?`1px solid ${T.border}33`:"none"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{color:T.muted,fontSize:12,width:20}}>#{i+1}</span>
+                          <span style={{color:T.white,fontWeight:700,fontSize:14}}>{p.name}</span>
+                        </div>
+                        <div style={{display:"flex",alignItems:"center",gap:16}}>
+                          <span style={{color:"#2ecc71",fontSize:12}}>🏆 {p.wins}W</span>
+                          <span style={{color:"#e74c3c",fontSize:12}}>💸 {p.losses}L</span>
+                          <span style={{color,fontWeight:900,fontSize:16,minWidth:60,textAlign:"right"}}>
+                            {pending>0?"+":""}{Math.round(pending*100)/100 === 0 ? "—" : `$${Math.abs(Math.round(pending*100)/100).toFixed(2)}`}
+                            {pending>0?" 📈":pending<0?" 📉":""}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Pending settlements */}
+                <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:14}}>
+                  <div style={{color:T.gold,fontWeight:900,fontSize:14,marginBottom:12}}>⚡ Pendiente por Saldar</div>
+                  {settlements.length===0?(
+                    <div style={{color:"#2ecc71",textAlign:"center",padding:16,fontWeight:700}}>✅ Todo saldado</div>
+                  ):settlements.map((s,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderTop:i>0?`1px solid ${T.border}33`:"none"}}>
+                      <span style={{color:"#e74c3c",fontWeight:700}}>{s.from}</span>
+                      <span style={{color:T.muted,fontSize:12}}>debe pagar</span>
+                      <span style={{color:T.gold,fontWeight:900,fontSize:16}}>${s.amount.toFixed(2)}</span>
+                      <span style={{color:T.muted,fontSize:12}}>a</span>
+                      <span style={{color:"#2ecc71",fontWeight:700}}>{s.to}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <button onClick={loadTotals} style={{marginTop:12,width:"100%",padding:"10px",borderRadius:8,border:`1px solid ${T.border}`,background:"transparent",color:T.muted,cursor:"pointer",fontSize:12,fontWeight:700}}>🔄 Refresh</button>
+              </>);
+            })()
+          )}
+
+          {cuentasTab==="weekly"&&(<>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center",marginBottom:16}}>
             {WEEKS.map((w,i)=>(
               <button key={i} onClick={()=>{setSelectedWeek(i);loadCuentas(i);}}
@@ -1876,6 +2042,7 @@ export default function App() {
               </>
             );
           })()}
+          </>)}
         </div>
       )}
     </div>
